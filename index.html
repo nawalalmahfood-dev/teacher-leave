@@ -293,8 +293,9 @@ footer{text-align:center}
         <div class="row"><button class="btn sm" type="submit">إضافة</button><button class="btn ghost sm" type="button" id="n-rand">رمز عشوائي</button><span class="msg" id="n-msg" hidden></span></div>
         <p class="hint">احتفظي بالرمز وأعطيه للمعلمة. لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
       </form>
+      <p class="hint">«رصيد سابق»: أيام الغياب ومرات الاستئذان المعتمدة قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وتظهر لها وللإدارة.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>رمز جديد</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -364,8 +365,11 @@ const inYear = r => r.date_from >= yStart && r.date_from <= yEnd;
 
 let limits = { abs_warn: 5, abs_max: 10, perm_warn: 6, perm_max: 12 };
 const LEVEL = { good: "ضمن المعدل", warn: "تنبيه", high: "مرتفع" };
-function tally(reqs) {
-  const s = { days: 0, perms: 0, minutes: 0, pend: 0, pendDays: 0, pendPerms: 0 };
+// t: the teacher row; her prior balance (entered by the admin) counts only for the year it was entered for.
+function tally(reqs, t) {
+  const prior = t && t.prior_year === yStartY;
+  const s = { days: prior ? t.prior_days || 0 : 0, perms: prior ? t.prior_perms || 0 : 0, minutes: 0, pend: 0, pendDays: 0, pendPerms: 0,
+    priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0 };
   reqs.filter(inYear).forEach(r => {
     const abs = r.type === "absence";
     if (r.status === "pending") { s.pend++; if (abs) s.pendDays += workDays(r.date_from, r.date_to); else s.pendPerms++; }
@@ -444,7 +448,7 @@ function renderTeacher() {
   if (tData.limits) limits = tData.limits;
   session.name = tData.teacher.name; $("role").textContent = session.name;
   const reqs = tData.requests || [];
-  const s = tally(reqs), lv = level(s);
+  const s = tally(reqs, tData.teacher), lv = level(s);
   $("m-days").textContent = s.days; $("m-perms").textContent = s.perms;
   $("m-absMax").textContent = limits.abs_max; $("m-permMax").textContent = limits.perm_max;
   const bar = (id, tick, v, warn, max) => {
@@ -464,7 +468,8 @@ function renderTeacher() {
     : lv === "warn"
       ? "انتبهي: " + parts.join("، و") + " هذا العام. حاولي تقليل الغياب والاستئذان قدر الإمكان."
       : "تنبيه مهم: " + parts.join("، و") + " هذا العام، وهذا أعلى من الحد الذي حددته الإدارة. يُرجى مراجعة الإدارة.";
-  $("m-note").textContent = "تحتسب الطلبات المعتمدة فقط من 1 أغسطس " + yStartY + "." + (s.pend ? " بانتظار الاعتماد: " + s.pendDays + " يوم غياب و" + s.pendPerms + " استئذان." : "");
+  $("m-note").textContent = "تحتسب الطلبات المعتمدة فقط من 1 أغسطس " + yStartY + "."
+    + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pend ? " بانتظار الاعتماد: " + s.pendDays + " يوم غياب و" + s.pendPerms + " استئذان." : "");
 
   const box = $("mine-list"); box.replaceChildren();
   if (!reqs.length) { box.append(el("div", "empty", "لا توجد طلبات بعد. سجلي غيابك أو استئذانك من النموذج أعلاه.")); return; }
@@ -614,7 +619,7 @@ $("a-login").addEventListener("submit", async ev => {
 
 async function loadAdmin() {
   const [t, r, s] = await Promise.all([
-    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until").is("removed_at", null).order("name"),
+    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until,prior_days,prior_perms,prior_year").is("removed_at", null).order("name"),
     sb.from("leave_requests").select("*").is("cancelled_at", null).order("date_from", { ascending: false }).limit(5000),
     sb.from("leave_settings").select("abs_warn,abs_max,perm_warn,perm_max").eq("id", 1).maybeSingle()
   ]);
@@ -625,7 +630,7 @@ async function loadAdmin() {
   if (s.data) limits = s.data;
   Object.keys(limits).forEach(k => { const i = $("l-" + k); if (i && document.activeElement !== i) i.value = limits[k]; });
   const by = new Map(); reqs.forEach(x => { if (!by.has(x.teacher_id)) by.set(x.teacher_id, []); by.get(x.teacher_id).push(x); });
-  tallies = new Map([...teachers.keys()].map(id => [id, tally(by.get(id) || [])]));
+  tallies = new Map([...teachers.keys()].map(id => [id, tally(by.get(id) || [], teachers.get(id))]));
   renderAdmin();
 }
 function renderAdmin() { renderDay(); renderAll(); renderSum(); renderStaff(); }
@@ -665,13 +670,26 @@ function renderSum() {
 }
 function renderStaff() {
   const body = $("staff-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 6; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const tr = el("tr");
     tr.append(el("td", null, t.name), el("td", null, t.specialty || "—"));
     const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
+    const priorTd = el("td"), pw = el("div", "inline-in");
+    const cur = t.prior_year === yStartY;
+    const pd = el("input"); pd.type = "number"; pd.min = "0"; pd.max = "365"; pd.value = cur ? t.prior_days : 0; pd.title = "أيام غياب سابقة"; pd.style.width = "64px"; pd.id = "pd-" + t.id;
+    const pp = el("input"); pp.type = "number"; pp.min = "0"; pp.max = "500"; pp.value = cur ? t.prior_perms : 0; pp.title = "مرات استئذان سابقة"; pp.style.width = "64px"; pp.id = "pp-" + t.id;
+    const ps = el("button", "btn ghost sm", "حفظ");
+    ps.onclick = async () => {
+      const d = Math.max(0, Math.round(+pd.value || 0)), q = Math.max(0, Math.round(+pp.value || 0));
+      ps.disabled = true;
+      const { error } = await sb.rpc("leave_admin_set_prior", { p_teacher: t.id, p_days: d, p_perms: q, p_year: yStartY });
+      ps.disabled = false; ps.textContent = error ? "تعذّر" : "تم ✓";
+      if (!error) setTimeout(loadAdmin, 600);
+    };
+    pw.append(pd, el("span", "hint", "/"), pp, ps); priorTd.append(pw); tr.append(priorTd);
     const pinTd = el("td"), wrap = el("div", "inline-in"), pin = el("input", "pin"); pin.inputMode = "numeric"; pin.maxLength = 4; pin.placeholder = "••••"; pin.id = "pin-" + t.id;
     pin.addEventListener("input", () => pin.value = pin.value.replace(/\D/g, "").slice(0, 4));
     const save = el("button", "btn ghost sm", "حفظ");
