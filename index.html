@@ -112,6 +112,7 @@ tr:last-child td{border-bottom:0}
 .limits{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .inline-in{display:flex;gap:6px;align-items:center}
 .inline-in input{width:90px;padding:5px 8px}
+a.wa{display:inline-block;font:600 .85rem var(--body);padding:5px 12px;border-radius:7px;background:var(--ok);color:var(--surface);text-decoration:none;white-space:nowrap}
 footer{text-align:center}
 @media (max-width:520px){.rec{grid-template-columns:1fr}.rec .why{grid-column:1}h1{font-size:1.35rem}}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
@@ -252,18 +253,40 @@ footer{text-align:center}
     </section>
 
     <section id="p-staff" class="list" style="gap:14px" hidden>
+      <div class="sheet" id="imp">
+        <h2>استيراد المعلمات من Excel</h2>
+        <p class="hint">ارفعي ملف Excel فيه أسماء المعلمات وأرقام جوالاتهن (والتخصص إن وجد). يُنشأ لكل معلمة رمز من 4 أرقام تلقائيًا، والأسماء الموجودة مسبقًا لا تتكرر.</p>
+        <label>ملف Excel أو CSV<input type="file" id="x-file" accept=".xlsx,.xls,.csv"></label>
+        <div id="x-map" class="list" hidden>
+          <div class="grid">
+            <label>عمود الاسم<select id="x-name"></select></label>
+            <label>عمود الجوال<select id="x-phone"></select></label>
+            <label>عمود التخصص<select id="x-spec"></select></label>
+          </div>
+          <p class="hint" id="x-count"></p>
+          <div class="tablebox"><table><thead><tr><th>الاسم</th><th>الجوال</th><th>التخصص</th></tr></thead><tbody id="x-preview"></tbody></table></div>
+          <div class="row"><button class="btn" id="x-go" type="button">استيراد المعلمات</button><span class="msg" id="x-msg" hidden></span></div>
+        </div>
+        <div id="x-result" class="list" hidden>
+          <div class="msg good" id="x-done"></div>
+          <p class="hint"><b>مهم:</b> الرموز تظهر هنا مرة واحدة فقط. أرسليها الآن بالواتساب أو حمّلي الملف واحتفظي به.</p>
+          <div class="row"><button class="btn sm" id="x-csv" type="button">تحميل الأسماء والرموز (Excel)</button></div>
+          <div class="tablebox"><table><thead><tr><th>المعلمة</th><th>الجوال</th><th>الرمز</th><th>إرسال</th></tr></thead><tbody id="x-res"></tbody></table></div>
+        </div>
+      </div>
       <form class="sheet" id="add" novalidate>
         <h2>إضافة معلمة</h2>
         <div class="grid">
           <label>الاسم<input id="n-name" maxlength="120"></label>
           <label>التخصص<input id="n-spec" maxlength="80"></label>
+          <label>الجوال<input id="n-phone" inputmode="tel" maxlength="20" dir="ltr"></label>
           <label>الرمز (4 أرقام)<input id="n-pin" class="pin" inputmode="numeric" maxlength="4"></label>
         </div>
         <div class="row"><button class="btn sm" type="submit">إضافة</button><button class="btn ghost sm" type="button" id="n-rand">رمز عشوائي</button><span class="msg" id="n-msg" hidden></span></div>
         <p class="hint">احتفظي بالرمز وأعطيه للمعلمة. لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
       </form>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الحالة</th><th>تغيير الرمز</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -273,6 +296,7 @@ footer{text-align:center}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (() => {
 const SB_URL = "https://mphtjlgrmbjubowdkact.supabase.co";
@@ -533,7 +557,7 @@ $("a-login").addEventListener("submit", async ev => {
 
 async function loadAdmin() {
   const [t, r, s] = await Promise.all([
-    sb.from("leave_teachers").select("id,name,specialty,active,locked_until").order("name"),
+    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until").order("name"),
     sb.from("leave_requests").select("*").is("cancelled_at", null).order("date_from", { ascending: false }).limit(5000),
     sb.from("leave_settings").select("abs_warn,abs_max,perm_warn,perm_max").eq("id", 1).maybeSingle()
   ]);
@@ -584,10 +608,11 @@ function renderSum() {
 }
 function renderStaff() {
   const body = $("staff-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 5; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 6; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const tr = el("tr");
     tr.append(el("td", null, t.name), el("td", null, t.specialty || "—"));
+    const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
     const pinTd = el("td"), wrap = el("div", "inline-in"), pin = el("input", "pin"); pin.inputMode = "numeric"; pin.maxLength = 4; pin.placeholder = "••••"; pin.id = "pin-" + t.id;
@@ -597,7 +622,11 @@ function renderStaff() {
       if (!/^\d{4}$/.test(pin.value)) { pin.focus(); return; }
       save.disabled = true;
       const { error } = await sb.rpc("leave_admin_set_pin", { p_teacher: t.id, p_pin: pin.value });
-      save.disabled = false; save.textContent = error ? "تعذّر" : "تم ✓"; if (!error) { pin.value = ""; setTimeout(loadAdmin, 800); }
+      save.disabled = false;
+      if (error) { save.textContent = "تعذّر"; return; }
+      const newPin = pin.value; pin.value = ""; save.textContent = "تم ✓";
+      const wa = waLink(t.phone, t.name, newPin);
+      if (wa) wrap.append(wa);
     };
     wrap.append(pin, save); pinTd.append(wrap); tr.append(pinTd);
     const tog = el("td"), b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
@@ -614,6 +643,94 @@ async function decide(r, status, note, act) {
   loadAdmin();
 }
 
+// ---------- WhatsApp + phone helpers ----------
+const SITE_URL = location.origin + location.pathname;
+function normPhone(v) {
+  let d = String(v ?? "").replace(/[٠-٩]/g, c => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/[۰-۹]/g, c => "۰۱۲۳۴۵۶۷۸۹".indexOf(c)).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("05") && d.length === 10) d = "966" + d.slice(1);
+  else if (d.startsWith("5") && d.length === 9) d = "966" + d;
+  return d;
+}
+function waLink(phone, name, pin) {
+  const d = normPhone(phone); if (d.length < 9) return null;
+  const text = "السلام عليكم أ. " + name + "\nرابط تسجيل الغياب والاستئذان:\n" + SITE_URL + "\nاختاري اسمك واكتبي رمزك: " + pin;
+  const a = el("a", "wa", "واتساب"); a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(text); a.target = "_blank"; a.rel = "noopener";
+  return a;
+}
+const csvDownload = (rows, filename) => {
+  const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const blob = new Blob(["\ufeff" + rows.map(r => r.map(q).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ---------- Excel import ----------
+let xRows = [], xHead = [], xResult = [];
+$("x-file").addEventListener("change", async () => {
+  const f = $("x-file").files[0]; $("x-result").hidden = true; $("x-msg").hidden = true;
+  if (!f) return;
+  if (!window.XLSX) { $("x-map").hidden = false; showMsg($("x-msg"), "تعذّر تحميل قارئ Excel. أعيدي فتح الصفحة.", false); return; }
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: "" })
+      .filter(r => r.some(c => String(c).trim()));
+    // Header row: the first of the first 5 rows that has a "name" heading.
+    const hi = rows.slice(0, 5).findIndex(r => r.some(c => /اسم|name/i.test(String(c))));
+    const width = Math.max(0, ...rows.map(r => r.length));
+    xHead = hi >= 0 ? rows[hi].map((c, i) => String(c).trim() || "عمود " + (i + 1)) : Array.from({ length: width }, (_, i) => "عمود " + (i + 1));
+    while (xHead.length < width) xHead.push("عمود " + (xHead.length + 1));
+    xRows = rows.slice(hi + 1);
+    const find = (re, not) => xHead.findIndex(h => re.test(h) && !(not && not.test(h)));
+    let ni = find(/اسم|name/i, /مدرسة|school/i), pi = find(/جوال|هاتف|موبايل|mobile|phone|واتس/i);
+    if (pi < 0) pi = find(/رقم/, /هوية|سجل|وظيف|id/i);
+    if (pi < 0) pi = xHead.findIndex((_, i) => xRows.slice(0, 10).filter(r => normPhone(r[i]).length >= 9).length >= 3);
+    const si = find(/تخصص|مادة|specialty|subject/i);
+    if (ni < 0) ni = 0;
+    const fill = (sel, idx, optional) => {
+      sel.replaceChildren();
+      if (optional) { const o = el("option", null, "— بدون —"); o.value = "-1"; sel.append(o); }
+      xHead.forEach((h, i) => { const o = el("option", null, h); o.value = i; sel.append(o); });
+      sel.value = String(idx);
+    };
+    fill($("x-name"), ni, false); fill($("x-phone"), pi, true); fill($("x-spec"), si, true);
+    $("x-map").hidden = false; previewImport();
+  } catch (e) { $("x-map").hidden = false; showMsg($("x-msg"), "تعذّرت قراءة الملف. تأكدي أنه ملف Excel صحيح.", false); }
+});
+["x-name", "x-phone", "x-spec"].forEach(id => $(id).addEventListener("change", previewImport));
+function importRows() {
+  const ni = +$("x-name").value, pi = +$("x-phone").value, si = +$("x-spec").value;
+  return xRows.map(r => ({ name: String(r[ni] ?? "").trim(), phone: pi >= 0 ? normPhone(r[pi]) : "", specialty: si >= 0 ? String(r[si] ?? "").trim() : "" }))
+    .filter(r => r.name.length >= 2 && !/^\d+$/.test(r.name));
+}
+function previewImport() {
+  const list = importRows(), body = $("x-preview"); body.replaceChildren();
+  $("x-count").textContent = "عدد المعلمات في الملف: " + list.length + (list.length > 8 ? " (يظهر أول 8)" : "");
+  list.slice(0, 8).forEach(r => { const tr = el("tr"); [r.name, r.phone || "—", r.specialty || "—"].forEach(v => tr.append(el("td", null, v))); body.append(tr); });
+  $("x-go").disabled = !list.length;
+}
+$("x-go").onclick = async () => {
+  const list = importRows(); if (!list.length) return;
+  $("x-go").disabled = true; showMsg($("x-msg"), "جارٍ الاستيراد…", true);
+  const { data, error } = await sb.rpc("leave_admin_import", { p_rows: list });
+  $("x-go").disabled = false;
+  if (error) return showMsg($("x-msg"), "تعذّر الاستيراد. حاولي مرة أخرى.", false);
+  $("x-msg").hidden = true; $("x-map").hidden = true; $("x-file").value = "";
+  xResult = data.filter(r => r.status === "added");
+  const skipped = data.length - xResult.length;
+  $("x-done").textContent = "تمت إضافة " + xResult.length + " معلمة." + (skipped ? " وتم تجاهل " + skipped + " لأن أسماءهن موجودة مسبقًا." : "");
+  const body = $("x-res"); body.replaceChildren();
+  xResult.forEach(r => {
+    const tr = el("tr"), ph = el("td", null, r.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right";
+    tr.append(el("td", null, r.name), ph, el("td", null, r.pin));
+    const td = el("td"), wa = waLink(r.phone, r.name, r.pin); td.append(wa || el("span", "hint", "لا يوجد جوال")); tr.append(td);
+    body.append(tr);
+  });
+  $("x-result").hidden = false;
+  loadAdmin();
+};
+$("x-csv").onclick = () => csvDownload([["المعلمة", "الجوال", "الرمز"], ...xResult.map(r => [r.name, r.phone, r.pin])], "رموز-المعلمات-" + todayISO + ".csv");
+
 $("n-pin").addEventListener("input", e => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4));
 $("n-rand").onclick = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); $("n-pin").value = String(a[0] % 10000).padStart(4, "0"); };
 $("add").addEventListener("submit", async ev => {
@@ -621,10 +738,13 @@ $("add").addEventListener("submit", async ev => {
   const m = $("n-msg"), name = $("n-name").value.trim(), pin = $("n-pin").value;
   if (name.length < 2) return showMsg(m, "اكتبي اسم المعلمة.", false);
   if (!/^\d{4}$/.test(pin)) return showMsg(m, "الرمز 4 أرقام.", false);
-  const { error } = await sb.rpc("leave_admin_add_teacher", { p_name: name, p_specialty: $("n-spec").value.trim(), p_pin: pin });
+  const { data: newId, error } = await sb.rpc("leave_admin_add_teacher", { p_name: name, p_specialty: $("n-spec").value.trim(), p_pin: pin });
   if (error) return showMsg(m, "تعذّرت الإضافة.", false);
+  const phone = normPhone($("n-phone").value);
+  if (phone) await sb.rpc("leave_admin_set_phone", { p_teacher: newId, p_phone: phone });
   showMsg(m, "تمت إضافة " + name + " — رمزها: " + pin, true);
-  $("n-name").value = ""; $("n-spec").value = ""; $("n-pin").value = "";
+  const wa = waLink(phone, name, pin); if (wa) { wa.style.marginInlineStart = "8px"; m.append(wa); }
+  $("n-name").value = ""; $("n-spec").value = ""; $("n-phone").value = ""; $("n-pin").value = "";
   loadAdmin();
 });
 
@@ -640,14 +760,11 @@ $("lim").addEventListener("submit", async ev => {
 });
 
 $("a-csv").onclick = () => {
-  const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const rows = [["المعلمة", "التخصص", "النوع", "التاريخ", "إلى تاريخ", "وقت الخروج", "وقت العودة", "المدة", "السبب", "ملاحظات", "الحالة", "ملاحظة الإدارة"]];
   filteredAll().forEach(r => { const t = teachers.get(r.teacher_id) || {}; const o = hhmm(r.time_out), b = hhmm(r.time_back);
     rows.push([t.name, t.specialty, TYPE[r.type], r.date_from, r.date_to, o, r.no_return ? "دون عودة" : b,
       r.type === "absence" ? workDays(r.date_from, r.date_to) + " يوم" : (r.no_return ? "" : dur(mins(o, b))), r.reason, r.notes, ST[r.status], r.admin_note]); });
-  const blob = new Blob(["﻿" + rows.map(r => r.map(q).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "غياب-واستئذان-" + todayISO + ".csv"; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  csvDownload(rows, "غياب-واستئذان-" + todayISO + ".csv");
 };
 
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
