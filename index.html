@@ -193,10 +193,12 @@ footer{text-align:center}
   <!-- ========== Admin sign-in ========== -->
   <form class="sheet narrow" id="a-login" novalidate hidden>
     <h2>دخول الإدارة</h2>
-    <label>البريد الإلكتروني<input type="email" id="a-email" autocomplete="username" dir="ltr"></label>
+    <label id="a-name-wrap">الاسم<select id="a-name"><option value="">جارٍ تحميل الأسماء…</option></select></label>
+    <label id="a-email-wrap" hidden>البريد الإلكتروني<input type="email" id="a-email" autocomplete="username" dir="ltr"></label>
     <label>كلمة المرور<input type="password" id="a-pass" autocomplete="current-password" dir="ltr"></label>
-    <button class="btn" type="submit">دخول</button>
+    <button class="btn" type="submit" id="a-go">دخول</button>
     <span class="msg" id="a-msg" hidden></span>
+    <button class="link" type="button" id="a-mode">الدخول بالبريد الإلكتروني بدلًا من الاسم</button>
   </form>
 
   <!-- ========== Admin area ========== -->
@@ -300,7 +302,7 @@ footer{text-align:center}
     <section id="p-admins" class="list" style="gap:14px" hidden>
       <form class="sheet" id="adm" novalidate>
         <h2>إضافة حساب إداري</h2>
-        <p class="hint">صاحبة الحساب الإداري ترى كل الطلبات وتعتمدها، وتضيف المعلمات وتغيّر الرموز. تدخل من «دخول الإدارة» بالبريد وكلمة المرور.</p>
+        <p class="hint">صاحبة الحساب الإداري ترى كل الطلبات وتعتمدها، وتضيف المعلمات وتغيّر الرموز. تدخل من «دخول الإدارة» باختيار اسمها (الاسم الظاهر) وكتابة كلمة المرور. البريد يُستخدم فقط لتفعيل الحساب.</p>
         <div class="grid">
           <label>المعلمة<select id="ad-teacher"><option value="">— اختاري من القائمة أو اكتبي الاسم —</option></select></label>
           <label>الاسم الظاهر<input id="ad-label" maxlength="120"></label>
@@ -572,12 +574,42 @@ function card(r, opts) {
 let teachers = new Map(), reqs = [], tallies = new Map(), pollId = null;
 const stopPoll = () => { if (pollId) clearInterval(pollId); pollId = null; };
 
+let byEmail = false;
+$("a-mode").onclick = () => {
+  byEmail = !byEmail;
+  $("a-name-wrap").hidden = byEmail; $("a-email-wrap").hidden = !byEmail;
+  $("a-mode").textContent = byEmail ? "الدخول بالاسم" : "الدخول بالبريد الإلكتروني بدلًا من الاسم";
+};
+async function loadAdminNames() {
+  const sel = $("a-name"), { data, error } = await sb.rpc("leave_public_admins");
+  sel.replaceChildren();
+  if (error) { sel.append(el("option", null, "تعذّر تحميل الأسماء")); sel.firstChild.value = ""; return; }
+  sel.append(el("option", null, "اختاري اسمك")); sel.firstChild.value = "";
+  data.forEach(a => { const o = el("option", null, a.label); o.value = a.label; sel.append(o); });
+}
 $("a-login").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const m = $("a-msg");
-  const { error } = await sb.auth.signInWithPassword({ email: $("a-email").value.trim(), password: $("a-pass").value });
-  if (error) return showMsg(m, "البريد أو كلمة المرور غير صحيحة.", false);
-  m.hidden = true; $("a-pass").value = ""; boot();
+  const m = $("a-msg"), password = $("a-pass").value;
+  if (!password) return showMsg(m, "اكتبي كلمة المرور.", false);
+  $("a-go").disabled = true;
+  try {
+    if (byEmail) {
+      const { error } = await sb.auth.signInWithPassword({ email: $("a-email").value.trim(), password });
+      if (error) return showMsg(m, "البريد أو كلمة المرور غير صحيحة.", false);
+    } else {
+      const name = $("a-name").value;
+      if (!name) return showMsg(m, "اختاري اسمك من القائمة.", false);
+      const res = await fetch(SB_URL + "/functions/v1/leave-admin-login", {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify({ name, password })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.access_token) return showMsg(m, d.error === "rate_limited" ? "محاولات كثيرة، انتظري دقائق ثم حاولي." : "الاسم أو كلمة المرور غير صحيحة.", false);
+      const { error } = await sb.auth.setSession({ access_token: d.access_token, refresh_token: d.refresh_token });
+      if (error) throw error;
+    }
+    m.hidden = true; $("a-pass").value = ""; boot();
+  } catch (e) { showMsg(m, "تعذّر الاتصال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
+  finally { $("a-go").disabled = false; }
 });
 
 async function loadAdmin() {
@@ -848,7 +880,7 @@ $("adm").addEventListener("submit", async ev => {
       : "تم. تقدر تدخل الآن من «دخول الإدارة» بالبريد وكلمة المرور.", true);
     $("ad-email").value = ""; $("ad-pass").value = ""; $("ad-label").value = ""; $("ad-teacher").value = "";
     loadAdmins();
-  } catch (e) { showMsg(m, "تعذّر الحفظ. حاولي مرة أخرى.", false); }
+  } catch (e) { showMsg(m, /duplicate|unique/i.test(e?.message || "") ? "هذا الاسم مستخدم لحساب إداري آخر. اكتبي اسمًا مختلفًا." : "تعذّر الحفظ. حاولي مرة أخرى.", false); }
   finally { $("ad-go").disabled = false; }
 });
 
@@ -885,9 +917,9 @@ async function boot() {
   $("notice").hidden = true;
   if (mode === "admin") {
     const { data: { session: s } } = await sb.auth.getSession();
-    if (!s) { show("a-login"); return; }
+    if (!s) { show("a-login"); loadAdminNames(); return; }
     const { data: ok } = await sb.rpc("is_leave_admin");
-    if (!ok) { await sb.auth.signOut(); show("a-login"); showMsg($("a-msg"), "هذا الحساب ليس له صلاحية الإدارة.", false); return; }
+    if (!ok) { await sb.auth.signOut(); show("a-login"); loadAdminNames(); showMsg($("a-msg"), "هذا الحساب ليس له صلاحية الإدارة.", false); return; }
     show("admin"); await loadAdmin();
     stopPoll(); pollId = setInterval(loadAdmin, 60000);
     return;
