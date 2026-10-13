@@ -206,6 +206,7 @@ footer{text-align:center}
       <button role="tab" data-tab="all" aria-selected="false">كل الطلبات</button>
       <button role="tab" data-tab="sum" aria-selected="false">ملخص المعلمات</button>
       <button role="tab" data-tab="staff" aria-selected="false">المعلمات والرموز</button>
+      <button role="tab" data-tab="admins" aria-selected="false">حسابات الإدارة</button>
     </nav>
 
     <section id="p-day" class="list" style="gap:16px">
@@ -274,6 +275,11 @@ footer{text-align:center}
           <div class="tablebox"><table><thead><tr><th>المعلمة</th><th>الجوال</th><th>الرمز</th><th>إرسال</th></tr></thead><tbody id="x-res"></tbody></table></div>
         </div>
       </div>
+      <div class="sheet">
+        <h2>رموز جديدة لكل المعلمات</h2>
+        <p class="hint">يعطي كل المعلمات رموزًا جديدة دفعة واحدة، وتتوقف الرموز القديمة فورًا. يظهر لك جدول بالرموز وأزرار الواتساب.</p>
+        <div class="row"><button class="btn sm" type="button" id="bulk-pin">إنشاء رموز جديدة للجميع</button><button class="btn ghost sm" type="button" id="bulk-cancel" hidden>إلغاء</button><span class="msg" id="bulk-msg" hidden></span></div>
+      </div>
       <form class="sheet" id="add" novalidate>
         <h2>إضافة معلمة</h2>
         <div class="grid">
@@ -288,6 +294,25 @@ footer{text-align:center}
       <div class="tablebox"><table>
         <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
+      </table></div>
+    </section>
+
+    <section id="p-admins" class="list" style="gap:14px" hidden>
+      <form class="sheet" id="adm" novalidate>
+        <h2>إضافة حساب إداري</h2>
+        <p class="hint">صاحبة الحساب الإداري ترى كل الطلبات وتعتمدها، وتضيف المعلمات وتغيّر الرموز. تدخل من «دخول الإدارة» بالبريد وكلمة المرور.</p>
+        <div class="grid">
+          <label>المعلمة<select id="ad-teacher"><option value="">— اختاري من القائمة أو اكتبي الاسم —</option></select></label>
+          <label>الاسم الظاهر<input id="ad-label" maxlength="120"></label>
+          <label>البريد الإلكتروني<input type="email" id="ad-email" dir="ltr" autocomplete="off"></label>
+          <label>كلمة المرور (8 أحرف على الأقل)<input type="text" id="ad-pass" dir="ltr" autocomplete="new-password"></label>
+        </div>
+        <div class="row"><button class="btn sm" type="submit" id="ad-go">إنشاء الحساب</button><span class="msg" id="ad-msg" hidden></span></div>
+        <p class="hint">إذا كان للبريد حساب سابق في نظامك، يُمنح صلاحية الإدارة بكلمة مروره الحالية، ولا تُستخدم كلمة المرور المكتوبة هنا.</p>
+      </form>
+      <div class="tablebox"><table>
+        <thead><tr><th>الاسم</th><th>البريد</th><th>الحالة</th><th></th></tr></thead>
+        <tbody id="ad-body"></tbody>
       </table></div>
     </section>
   </section>
@@ -557,14 +582,14 @@ $("a-login").addEventListener("submit", async ev => {
 
 async function loadAdmin() {
   const [t, r, s] = await Promise.all([
-    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until").order("name"),
+    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until").is("removed_at", null).order("name"),
     sb.from("leave_requests").select("*").is("cancelled_at", null).order("date_from", { ascending: false }).limit(5000),
     sb.from("leave_settings").select("abs_warn,abs_max,perm_warn,perm_max").eq("id", 1).maybeSingle()
   ]);
   if (t.error || r.error) { showMsg($("notice"), "تعذّر تحميل البيانات. اضغطي «تحديث».", false); return; }
   $("notice").hidden = true;
   teachers = new Map(t.data.map(x => [x.id, x]));
-  reqs = r.data;
+  reqs = r.data.filter(x => teachers.has(x.teacher_id));
   if (s.data) limits = s.data;
   Object.keys(limits).forEach(k => { const i = $("l-" + k); if (i && document.activeElement !== i) i.value = limits[k]; });
   const by = new Map(); reqs.forEach(x => { if (!by.has(x.teacher_id)) by.set(x.teacher_id, []); by.get(x.teacher_id).push(x); });
@@ -631,7 +656,16 @@ function renderStaff() {
     wrap.append(pin, save); pinTd.append(wrap); tr.append(pinTd);
     const tog = el("td"), b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
     b.onclick = async () => { b.disabled = true; await sb.from("leave_teachers").update({ active: !t.active }).eq("id", t.id); loadAdmin(); };
-    tog.append(b); tr.append(tog);
+    const del = el("button", "link", "حذف"); del.style.color = "var(--absent)";
+    let armed = false;
+    del.onclick = async () => {
+      if (!armed) { armed = true; del.textContent = "تأكيد حذف " + t.name + "؟"; setTimeout(() => { armed = false; del.textContent = "حذف"; }, 5000); return; }
+      del.disabled = true;
+      const { error } = await sb.rpc("leave_admin_remove_teacher", { p_teacher: t.id });
+      if (error) { del.disabled = false; del.textContent = "تعذّر الحذف"; return; }
+      loadAdmin();
+    };
+    tog.style.whiteSpace = "nowrap"; tog.append(b, el("span", "hint", " · "), del); tr.append(tog);
     body.append(tr);
   });
 }
@@ -716,9 +750,13 @@ $("x-go").onclick = async () => {
   $("x-go").disabled = false;
   if (error) return showMsg($("x-msg"), "تعذّر الاستيراد. حاولي مرة أخرى.", false);
   $("x-msg").hidden = true; $("x-map").hidden = true; $("x-file").value = "";
-  xResult = data.filter(r => r.status === "added");
-  const skipped = data.length - xResult.length;
-  $("x-done").textContent = "تمت إضافة " + xResult.length + " معلمة." + (skipped ? " وتم تجاهل " + skipped + " لأن أسماءهن موجودة مسبقًا." : "");
+  const added = data.filter(r => r.status === "added"), skipped = data.length - added.length;
+  showPins(added, "تمت إضافة " + added.length + " معلمة." + (skipped ? " وتم تجاهل " + skipped + " لأن أسماءهن موجودة مسبقًا." : ""));
+  loadAdmin();
+};
+function showPins(list, doneText) {
+  xResult = list;
+  $("x-done").textContent = doneText;
   const body = $("x-res"); body.replaceChildren();
   xResult.forEach(r => {
     const tr = el("tr"), ph = el("td", null, r.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right";
@@ -727,6 +765,23 @@ $("x-go").onclick = async () => {
     body.append(tr);
   });
   $("x-result").hidden = false;
+  $("x-result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+let bulkArmed = false;
+$("bulk-cancel").onclick = () => { bulkArmed = false; $("bulk-pin").textContent = "إنشاء رموز جديدة للجميع"; $("bulk-cancel").hidden = true; $("bulk-msg").hidden = true; };
+$("bulk-pin").onclick = async () => {
+  const m = $("bulk-msg");
+  if (!bulkArmed) {
+    bulkArmed = true; $("bulk-pin").textContent = "نعم، غيّري رموز " + teachers.size + " معلمة"; $("bulk-cancel").hidden = false;
+    showMsg(m, "الرموز القديمة ستتوقف، وتحتاجين ترسلين الرموز الجديدة لكل المعلمات.", false); return;
+  }
+  $("bulk-pin").disabled = true; $("bulk-cancel").hidden = true;
+  const { data, error } = await sb.rpc("leave_admin_reset_all_pins");
+  $("bulk-pin").disabled = false; bulkArmed = false; $("bulk-pin").textContent = "إنشاء رموز جديدة للجميع";
+  if (error) return showMsg(m, "تعذّر إنشاء الرموز. حاولي مرة أخرى.", false);
+  m.hidden = true;
+  showPins(data, "تم إنشاء رموز جديدة لـ " + data.length + " معلمة.");
   loadAdmin();
 };
 $("x-csv").onclick = () => csvDownload([["المعلمة", "الجوال", "الرمز"], ...xResult.map(r => [r.name, r.phone, r.pin])], "رموز-المعلمات-" + todayISO + ".csv");
@@ -746,6 +801,55 @@ $("add").addEventListener("submit", async ev => {
   const wa = waLink(phone, name, pin); if (wa) { wa.style.marginInlineStart = "8px"; m.append(wa); }
   $("n-name").value = ""; $("n-spec").value = ""; $("n-phone").value = ""; $("n-pin").value = "";
   loadAdmin();
+});
+
+// ---------- admin accounts ----------
+const signupClient = supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "leave-signup" } });
+async function loadAdmins() {
+  const sel = $("ad-teacher"), keep = sel.value; sel.replaceChildren(el("option", null, "— اختاري من القائمة أو اكتبي الاسم —")); sel.firstChild.value = "";
+  [...teachers.values()].forEach(t => { const o = el("option", null, t.name); o.value = t.name; sel.append(o); }); sel.value = keep;
+  const body = $("ad-body"); body.replaceChildren();
+  const { data, error } = await sb.rpc("leave_admin_list");
+  if (error) { const tr = el("tr"), td = el("td", null, "تعذّر تحميل الحسابات."); td.colSpan = 4; tr.append(td); body.append(tr); return; }
+  data.forEach(a => {
+    const tr = el("tr"), em = el("td", null, a.email); em.dir = "ltr"; em.style.textAlign = "right";
+    tr.append(el("td", null, (a.label || "—") + (a.is_me ? " (أنتِ)" : "")), em);
+    const st = el("td"); st.append(el("span", "st " + (!a.active ? "rejected" : a.confirmed ? "approved" : "pending"), !a.active ? "موقوف" : a.confirmed ? "فعّال" : "بانتظار تفعيل البريد")); tr.append(st);
+    const act = el("td");
+    if (!a.is_me) {
+      const b = el("button", "link", a.active ? "إيقاف الصلاحية" : "إعادة الصلاحية");
+      b.onclick = async () => { b.disabled = true; await sb.rpc("leave_admin_set_active", { p_user: a.user_id, p_active: !a.active }); loadAdmins(); };
+      act.append(b);
+    }
+    tr.append(act); body.append(tr);
+  });
+}
+$("ad-teacher").addEventListener("change", () => { if ($("ad-teacher").value) $("ad-label").value = $("ad-teacher").value; });
+$("adm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const m = $("ad-msg"), email = $("ad-email").value.trim().toLowerCase(), pass = $("ad-pass").value, label = $("ad-label").value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(m, "اكتبي بريدًا إلكترونيًا صحيحًا.", false);
+  if (!label) return showMsg(m, "اختاري المعلمة أو اكتبي الاسم.", false);
+  $("ad-go").disabled = true;
+  try {
+    let { data: res, error } = await sb.rpc("leave_admin_grant", { p_email: email, p_label: label });
+    if (error) throw error;
+    let pending = false;
+    if (res === "no_account") {
+      if (pass.length < 8) return showMsg(m, "كلمة المرور يجب أن تكون 8 أحرف على الأقل.", false);
+      const su = await signupClient.auth.signUp({ email, password: pass, options: { emailRedirectTo: SITE_URL + "#admin" } });
+      if (su.error) return showMsg(m, "تعذّر إنشاء الحساب: " + (/rate|limit/i.test(su.error.message) ? "محاولات كثيرة، انتظري قليلًا." : su.error.message), false);
+      pending = !su.data.session;
+      ({ data: res, error } = await sb.rpc("leave_admin_grant", { p_email: email, p_label: label }));
+      if (error || res === "no_account") return showMsg(m, "أُنشئ الحساب لكن تعذّر منحه الصلاحية. حاولي مرة أخرى.", false);
+    }
+    showMsg(m, res === "reactivated" ? "أُعيدت صلاحية الإدارة لهذا الحساب."
+      : pending ? "تم إنشاء الحساب. وصلها رابط تفعيل على بريدها، تضغطه ثم تدخل من «دخول الإدارة»."
+      : "تم. تقدر تدخل الآن من «دخول الإدارة» بالبريد وكلمة المرور.", true);
+    $("ad-email").value = ""; $("ad-pass").value = ""; $("ad-label").value = ""; $("ad-teacher").value = "";
+    loadAdmins();
+  } catch (e) { showMsg(m, "تعذّر الحفظ. حاولي مرة أخرى.", false); }
+  finally { $("ad-go").disabled = false; }
 });
 
 $("lim").addEventListener("submit", async ev => {
@@ -769,7 +873,8 @@ $("a-csv").onclick = () => {
 
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
-  ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
+  ["day", "all", "sum", "staff", "admins"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
+  if (b.dataset.tab === "admins") loadAdmins();
 }));
 ["a-q", "a-type", "a-st", "a-from", "a-to"].forEach(id => $(id).addEventListener("input", renderAll));
 $("d-date").addEventListener("input", renderDay);
