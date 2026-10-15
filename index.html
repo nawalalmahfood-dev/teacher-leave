@@ -547,9 +547,11 @@ function card(r, opts) {
   const isAbs = r.type === "absence";
   c.append(mid, el("span", "st " + r.status, isAbs && r.status === "approved" ? "مسجّل" : ST[r.status]));
   c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")));
-  if (opts.admin && !(isAbs && r.status === "approved")) {
+  if (opts.admin) {
     const act = el("div", "act");
-    if (r.status === "pending") {
+    if (isAbs) {
+      // recorded absences have no approval step
+    } else if (r.status === "pending") {
       const note = el("input", "note-in"); note.placeholder = "ملاحظة للمعلمة (اختياري)"; note.id = "n-" + r.id; note.maxLength = 300;
       const ok = el("button", "btn ok sm", "اعتماد"), no = el("button", "btn no sm", "رفض");
       ok.onclick = () => decide(r, "approved", note.value, act);
@@ -559,6 +561,18 @@ function card(r, opts) {
       const undo = el("button", "btn ghost sm", "إعادة إلى الانتظار");
       undo.onclick = () => decide(r, "pending", "", act); act.append(undo);
     }
+    // Admin can cancel any absence or early-leave request; it then drops out of every list and count.
+    const kill = el("button", "btn no sm", isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان");
+    kill.style.marginInlineStart = "auto";
+    let armed = false;
+    kill.onclick = async () => {
+      if (!armed) { armed = true; kill.textContent = "تأكيد الإلغاء؟"; setTimeout(() => { armed = false; kill.textContent = isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان"; }, 5000); return; }
+      act.querySelectorAll("button").forEach(x => x.disabled = true);
+      const { error } = await sb.from("leave_requests").update({ cancelled_at: new Date().toISOString() }).eq("id", r.id);
+      if (error) { act.querySelectorAll("button").forEach(x => x.disabled = false); act.append(el("span", "msg bad", "تعذّر الإلغاء.")); return; }
+      loadAdmin();
+    };
+    act.append(kill);
     c.append(act);
   } else if (opts.mine && (r.status === "pending" || (isAbs && r.date_from >= todayISO))) {
     const act = el("div", "act"), cancel = el("button", "btn ghost sm", isAbs ? "إلغاء الغياب" : "إلغاء الطلب");
