@@ -237,7 +237,7 @@ footer{text-align:center}
     </section>
 
     <section id="p-sum" class="list" style="gap:12px" hidden>
-      <p class="hint">أرقام <span class="yr"></span> للطلبات المعتمدة فقط. أيام الغياب تحتسب أيام الدوام من الأحد إلى الخميس.</p>
+      <p class="hint">أرقام <span class="yr"></span>: الغياب المسجّل والاستئذان المعتمد. أيام الغياب تحتسب أيام الدوام من الأحد إلى الخميس.</p>
       <div class="tablebox"><table>
         <thead><tr><th>المعلمة</th><th>التخصص</th><th>أيام الغياب</th><th>مرات الاستئذان</th><th>ساعات الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
         <tbody id="sum-body"></tbody>
@@ -468,8 +468,8 @@ function renderTeacher() {
     : lv === "warn"
       ? "انتبهي: " + parts.join("، و") + " هذا العام. حاولي تقليل الغياب والاستئذان قدر الإمكان."
       : "تنبيه مهم: " + parts.join("، و") + " هذا العام، وهذا أعلى من الحد الذي حددته الإدارة. يُرجى مراجعة الإدارة.";
-  $("m-note").textContent = "تحتسب الطلبات المعتمدة فقط من 1 أغسطس " + yStartY + "."
-    + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pend ? " بانتظار الاعتماد: " + s.pendDays + " يوم غياب و" + s.pendPerms + " استئذان." : "");
+  $("m-note").textContent = "يُحتسب الغياب المسجّل والاستئذان المعتمد من 1 أغسطس " + yStartY + "."
+    + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pendPerms ? " استئذان بانتظار الاعتماد: " + s.pendPerms + "." : "");
 
   const box = $("mine-list"); box.replaceChildren();
   if (!reqs.length) { box.append(el("div", "empty", "لا توجد طلبات بعد. سجلي غيابك أو استئذانك من النموذج أعلاه.")); return; }
@@ -524,7 +524,7 @@ $("f").addEventListener("submit", async ev => {
     if (error) throw error;
     if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات." : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
     $("f-notes").value = "";
-    showMsg(msg, "تم إرسال طلب " + TYPE[type] + " إلى الإدارة.", true);
+    showMsg(msg, type === "absence" ? "تم تسجيل غيابك." : "تم إرسال طلب الاستئذان إلى الإدارة للاعتماد.", true);
     tData = await fetchTeacher(); renderTeacher();
   } catch (e) { showMsg(msg, "تعذّر الإرسال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
   finally { $("f-submit").disabled = false; }
@@ -543,9 +543,11 @@ function card(r, opts) {
     mid.append(nm);
   }
   mid.append(el("div", "when", whenText(r)));
-  c.append(mid, el("span", "st " + r.status, ST[r.status]));
+  // Absences are recorded directly, with no approval step.
+  const isAbs = r.type === "absence";
+  c.append(mid, el("span", "st " + r.status, isAbs && r.status === "approved" ? "مسجّل" : ST[r.status]));
   c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")));
-  if (opts.admin) {
+  if (opts.admin && !(isAbs && r.status === "approved")) {
     const act = el("div", "act");
     if (r.status === "pending") {
       const note = el("input", "note-in"); note.placeholder = "ملاحظة للمعلمة (اختياري)"; note.id = "n-" + r.id; note.maxLength = 300;
@@ -558,8 +560,8 @@ function card(r, opts) {
       undo.onclick = () => decide(r, "pending", "", act); act.append(undo);
     }
     c.append(act);
-  } else if (opts.mine && r.status === "pending") {
-    const act = el("div", "act"), cancel = el("button", "btn ghost sm", "إلغاء الطلب");
+  } else if (opts.mine && (r.status === "pending" || (isAbs && r.date_from >= todayISO))) {
+    const act = el("div", "act"), cancel = el("button", "btn ghost sm", isAbs ? "إلغاء الغياب" : "إلغاء الطلب");
     let armed = false;
     cancel.onclick = async () => {
       if (!armed) { armed = true; cancel.textContent = "اضغطي مرة أخرى لتأكيد الإلغاء"; return; }
