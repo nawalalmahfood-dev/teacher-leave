@@ -112,6 +112,11 @@ tr:last-child td{border-bottom:0}
 .limits{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .inline-in{display:flex;gap:6px;align-items:center}
 .inline-in input{width:90px;padding:5px 8px}
+.periods-box{grid-column:1 / -1;display:flex;flex-direction:column;gap:6px}
+.plabel{font-size:.85rem;font-weight:600;color:var(--muted)}
+.periods{display:flex;flex-wrap:wrap;gap:8px}
+.periods button{font:600 .9rem var(--body);min-width:84px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.periods button[aria-pressed="true"]{background:var(--leave-soft);border-color:var(--leave);color:var(--leave)}
 a.wa{display:inline-block;font:600 .85rem var(--body);padding:5px 12px;border-radius:7px;background:var(--ok);color:var(--surface);text-decoration:none;white-space:nowrap}
 footer{text-align:center}
 @media (max-width:520px){.rec{grid-template-columns:1fr}.rec .why{grid-column:1}h1{font-size:1.35rem}}
@@ -168,13 +173,13 @@ footer{text-align:center}
       </div>
       <div class="grid" id="g-permission" hidden>
         <label>تاريخ الاستئذان<input type="date" id="f-pdate"></label>
-        <label>وقت الخروج<input type="time" id="f-out"></label>
-        <label>وقت العودة المتوقع<input type="time" id="f-back"></label>
         <label>سبب الاستئذان<select id="f-preason">
           <option>موعد طبي</option><option>مراجعة جهة حكومية</option><option>ظرف أسري</option>
           <option>ظرف طارئ</option><option>أخرى</option></select></label>
-        <label style="flex-direction:row;align-items:center;gap:8px;font-weight:500">
-          <input type="checkbox" id="f-noreturn" style="width:auto"> لن أعود بعد الخروج (حتى نهاية الدوام)</label>
+        <div class="periods-box">
+          <span class="plabel">الحصص (اختاري حصة أو أكثر)</span>
+          <div class="periods" id="f-periods" role="group" aria-label="الحصص"></div>
+        </div>
       </div>
       <div class="calc" id="calc"></div>
       <label>ملاحظات<textarea id="f-notes" maxlength="1000" placeholder="تفاصيل إضافية للإدارة، مثل الحصص التي تحتاج انتظار"></textarea></label>
@@ -239,7 +244,7 @@ footer{text-align:center}
     <section id="p-sum" class="list" style="gap:12px" hidden>
       <p class="hint">أرقام <span class="yr"></span>: الغياب المسجّل والاستئذان المعتمد. أيام الغياب تحتسب أيام الدوام من الأحد إلى الخميس.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>أيام الغياب</th><th>مرات الاستئذان</th><th>ساعات الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
         <tbody id="sum-body"></tbody>
       </table></div>
       <form class="sheet" id="lim" novalidate>
@@ -368,14 +373,14 @@ const LEVEL = { good: "ضمن المعدل", warn: "تنبيه", high: "مرتف
 // t: the teacher row; her prior balance (entered by the admin) counts only for the year it was entered for.
 function tally(reqs, t) {
   const prior = t && t.prior_year === yStartY;
-  const s = { days: prior ? t.prior_days || 0 : 0, perms: prior ? t.prior_perms || 0 : 0, minutes: 0, pend: 0, pendDays: 0, pendPerms: 0,
+  const s = { days: prior ? t.prior_days || 0 : 0, perms: prior ? t.prior_perms || 0 : 0, periods: 0, pend: 0, pendDays: 0, pendPerms: 0,
     priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0 };
   reqs.filter(inYear).forEach(r => {
     const abs = r.type === "absence";
     if (r.status === "pending") { s.pend++; if (abs) s.pendDays += workDays(r.date_from, r.date_to); else s.pendPerms++; }
     if (r.status !== "approved") return;
     if (abs) s.days += workDays(r.date_from, r.date_to);
-    else { s.perms++; s.minutes += r.no_return ? 0 : Math.max(0, mins(hhmm(r.time_out), hhmm(r.time_back))); }
+    else { s.perms++; s.periods += (r.periods || []).length; }
   });
   return s;
 }
@@ -388,10 +393,16 @@ function whenText(r) {
   if (r.type === "absence") {
     return r.date_from === r.date_to ? fmtDate(r.date_from) : "من " + fmtDate(r.date_from) + " إلى " + fmtDate(r.date_to) + " · " + workDays(r.date_from, r.date_to) + " أيام دوام";
   }
+  if (r.periods && r.periods.length) return fmtDate(r.date_from) + " · " + periodsText(r.periods) + " (" + r.periods.length + (r.periods.length === 1 ? " حصة)" : " حصص)");
+  // requests recorded before periods were introduced
   const o = hhmm(r.time_out), b = hhmm(r.time_back);
   return fmtDate(r.date_from) + " · خروج " + fmtTime(o) + (r.no_return ? " دون عودة" : " · عودة " + fmtTime(b) + " (" + dur(mins(o, b)) + ")");
 }
 const covers = (r, day) => r.date_from <= day && day <= r.date_to;
+// Sun/Wed/Thu = 6 periods, Mon/Tue = 7, Fri/Sat = no school.
+const periodsInDay = iso => [6, 7, 7, 6, 6, 0, 0][parse(iso).getDay()];
+const ORD = ["", "الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة", "السادسة", "السابعة"];
+const periodsText = ps => (ps.length === 1 ? "الحصة " : "الحصص: ") + ps.map(p => ORD[p] || p).join("، ");
 
 // ---------- view switching ----------
 let mode = location.hash === "#admin" ? "admin" : "teacher";
@@ -462,7 +473,7 @@ function renderTeacher() {
   const a = $("m-alert"); a.className = "alert " + lv;
   const parts = [];
   if (s.days >= limits.abs_warn) parts.push("غيابك وصل " + s.days + " " + (s.days === 1 ? "يوم" : "أيام"));
-  if (s.perms >= limits.perm_warn) parts.push("استئذانك وصل " + s.perms + " مرات (" + hrs(s.minutes) + " ساعة)");
+  if (s.perms >= limits.perm_warn) parts.push("استئذانك وصل " + s.perms + " مرات (" + s.periods + " حصة)");
   a.textContent = lv === "good"
     ? "رصيدك جيد. غيابك " + s.days + " " + (s.days === 1 ? "يوم" : "أيام") + " واستئذانك " + s.perms + " مرات هذا العام الدراسي."
     : lv === "warn"
@@ -484,8 +495,20 @@ document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click"
   document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
   $("g-absence").hidden = type !== "absence"; $("g-permission").hidden = type !== "permission"; calc();
 }));
-$("f-noreturn").addEventListener("change", () => { $("f-back").disabled = $("f-noreturn").checked; calc(); });
-["f-from", "f-to", "f-out", "f-back", "f-pdate"].forEach(id => $(id).addEventListener("input", calc));
+let chosen = new Set();
+function renderPeriods() {
+  const box = $("f-periods"), n = $("f-pdate").value ? periodsInDay($("f-pdate").value) : 0;
+  chosen = new Set([...chosen].filter(p => p <= n));
+  box.replaceChildren();
+  if (!n) { box.append(el("span", "hint", $("f-pdate").value ? "لا يوجد دوام في هذا اليوم." : "اختاري التاريخ أولًا.")); return; }
+  for (let p = 1; p <= n; p++) {
+    const b = el("button", null, "الحصة " + ORD[p]); b.type = "button"; b.setAttribute("aria-pressed", String(chosen.has(p)));
+    b.onclick = () => { chosen.has(p) ? chosen.delete(p) : chosen.add(p); b.setAttribute("aria-pressed", String(chosen.has(p))); calc(); };
+    box.append(b);
+  }
+}
+$("f-pdate").addEventListener("input", () => { renderPeriods(); calc(); });
+["f-from", "f-to"].forEach(id => $(id).addEventListener("input", calc));
 function calc() {
   const c = $("calc");
   if (type === "absence") {
@@ -495,14 +518,14 @@ function calc() {
     const n = workDays(a, b);
     c.textContent = "مدة الغياب: " + n + (n === 1 ? " يوم دوام" : " أيام دوام") + " (بدون الجمعة والسبت)";
   } else {
-    const o = $("f-out").value, k = $("f-back").value;
-    if (!o) { c.textContent = "سجلي وقت الخروج."; return; }
-    if ($("f-noreturn").checked) { c.textContent = "خروج عند " + fmtTime(o) + " دون عودة حتى نهاية الدوام."; return; }
-    if (!k) { c.textContent = "سجلي وقت العودة المتوقع."; return; }
-    const m = mins(o, k);
-    c.textContent = m > 0 ? "مدة الاستئذان: " + dur(m) + " (من " + fmtTime(o) + " إلى " + fmtTime(k) + ")" : "وقت العودة يجب أن يكون بعد وقت الخروج.";
+    const d = $("f-pdate").value, n = d ? periodsInDay(d) : 0;
+    if (!d) { c.textContent = "اختاري تاريخ الاستئذان."; return; }
+    if (!n) { c.textContent = "هذا اليوم إجازة نهاية الأسبوع."; return; }
+    const ps = [...chosen].sort((a, b) => a - b);
+    c.textContent = ps.length ? "الاستئذان: " + periodsText(ps) + " — " + ps.length + " من " + n + " حصص" : "اختاري حصة أو أكثر (" + AR_DAY.format(parse(d)) + ": " + n + " حصص).";
   }
 }
+renderPeriods();
 calc();
 
 $("f").addEventListener("submit", async ev => {
@@ -513,16 +536,20 @@ $("f").addEventListener("submit", async ev => {
     r.date_from = $("f-from").value; r.date_to = $("f-to").value || r.date_from; r.reason = $("f-areason").value;
     if (!r.date_from || r.date_to < r.date_from) return showMsg(msg, "راجعي تواريخ الغياب.", false);
   } else {
-    r.date_from = $("f-pdate").value; r.time_out = $("f-out").value; r.no_return = $("f-noreturn").checked;
-    r.time_back = r.no_return ? "" : $("f-back").value; r.reason = $("f-preason").value;
-    if (!r.date_from || !r.time_out) return showMsg(msg, "حددي تاريخ ووقت الخروج.", false);
-    if (!r.no_return && mins(r.time_out, r.time_back) <= 0) return showMsg(msg, "وقت العودة يجب أن يكون بعد وقت الخروج.", false);
+    r.date_from = $("f-pdate").value; r.reason = $("f-preason").value; r.periods = [...chosen].sort((a, b) => a - b);
+    if (!r.date_from) return showMsg(msg, "اختاري تاريخ الاستئذان.", false);
+    if (!periodsInDay(r.date_from)) return showMsg(msg, "هذا اليوم إجازة نهاية الأسبوع.", false);
+    if (!r.periods.length) return showMsg(msg, "اختاري حصة واحدة على الأقل.", false);
   }
   $("f-submit").disabled = true;
   try {
     const { data, error } = await sb.rpc("leave_submit", { p_teacher: session.id, p_pin: session.pin, p_req: r });
     if (error) throw error;
-    if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات." : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
+    if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات."
+      : data.error === "no_school" ? "هذا اليوم إجازة نهاية الأسبوع."
+      : data.error === "bad_periods" ? "اختيار الحصص غير صحيح لهذا اليوم."
+      : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
+    chosen.clear(); renderPeriods();
     $("f-notes").value = "";
     showMsg(msg, type === "absence" ? "تم تسجيل غيابك." : "تم إرسال طلب الاستئذان إلى الإدارة للاعتماد.", true);
     tData = await fetchTeacher(); renderTeacher();
@@ -659,7 +686,7 @@ function renderDay() {
   $("s-wait").textContent = reqs.filter(x => x.status === "pending").length;
   const box = $("day-list"); box.replaceChildren();
   if (!items.length) box.append(el("div", "empty", "لا يوجد غياب أو استئذان مسجل لهذا اليوم."));
-  items.sort((a, b) => a.type.localeCompare(b.type) || (a.time_out || "").localeCompare(b.time_out || "")).forEach(x => box.append(card(x, { admin: true })));
+  items.sort((a, b) => a.type.localeCompare(b.type) || ((a.periods || [9])[0] - (b.periods || [9])[0])).forEach(x => box.append(card(x, { admin: true })));
   const pend = reqs.filter(x => x.status === "pending" && !covers(x, day));
   if (pend.length) { box.append(el("h2", null, "طلبات أخرى بانتظار الاعتماد")); pend.forEach(x => box.append(card(x, { admin: true }))); }
 }
@@ -679,7 +706,7 @@ function renderSum() {
   if (!teachers.size) { const tr = el("tr"), td = el("td", null, "أضيفي المعلمات من تبويب «المعلمات والرموز»."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   [...teachers.values()].map(t => ({ t, s: tallies.get(t.id) })).sort((a, b) => b.s.days - a.s.days || b.s.perms - a.s.perms).forEach(({ t, s }) => {
     const tr = el("tr");
-    [t.name, t.specialty || "—", s.days, s.perms, hrs(s.minutes), s.pend].forEach(v => tr.append(el("td", null, String(v))));
+    [t.name, t.specialty || "—", s.days, s.perms, s.periods, s.pend].forEach(v => tr.append(el("td", null, String(v))));
     const lv = level(s), td = el("td"); td.append(el("span", "st " + lv, LEVEL[lv])); tr.append(td);
     body.append(tr);
   });
@@ -930,10 +957,10 @@ $("lim").addEventListener("submit", async ev => {
 });
 
 $("a-csv").onclick = () => {
-  const rows = [["المعلمة", "التخصص", "النوع", "التاريخ", "إلى تاريخ", "وقت الخروج", "وقت العودة", "المدة", "السبب", "ملاحظات", "الحالة", "ملاحظة الإدارة"]];
-  filteredAll().forEach(r => { const t = teachers.get(r.teacher_id) || {}; const o = hhmm(r.time_out), b = hhmm(r.time_back);
-    rows.push([t.name, t.specialty, TYPE[r.type], r.date_from, r.date_to, o, r.no_return ? "دون عودة" : b,
-      r.type === "absence" ? workDays(r.date_from, r.date_to) + " يوم" : (r.no_return ? "" : dur(mins(o, b))), r.reason, r.notes, ST[r.status], r.admin_note]); });
+  const rows = [["المعلمة", "التخصص", "النوع", "التاريخ", "إلى تاريخ", "الحصص", "المدة", "السبب", "ملاحظات", "الحالة", "ملاحظة الإدارة"]];
+  filteredAll().forEach(r => { const t = teachers.get(r.teacher_id) || {}, ps = r.periods || [];
+    rows.push([t.name, t.specialty, TYPE[r.type], r.date_from, r.date_to, ps.map(p => ORD[p]).join("، "),
+      r.type === "absence" ? workDays(r.date_from, r.date_to) + " يوم" : ps.length + " حصة", r.reason, r.notes, r.type === "absence" ? "مسجّل" : ST[r.status], r.admin_note]); });
   csvDownload(rows, "غياب-واستئذان-" + todayISO + ".csv");
 };
 
