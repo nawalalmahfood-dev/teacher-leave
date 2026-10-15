@@ -490,6 +490,9 @@ function renderTeacher() {
 // form
 let type = "absence";
 ["f-from", "f-to", "f-pdate", "d-date"].forEach(id => $(id).value = todayISO);
+// Teachers can only record today or later.
+["f-from", "f-to", "f-pdate"].forEach(id => $(id).min = todayISO);
+$("f-from").addEventListener("input", () => { $("f-to").min = $("f-from").value || todayISO; if ($("f-to").value < $("f-to").min) $("f-to").value = $("f-to").min; });
 document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
   type = b.dataset.t;
   document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
@@ -514,12 +517,14 @@ function calc() {
   if (type === "absence") {
     const a = $("f-from").value, b = $("f-to").value;
     if (!a || !b) { c.textContent = "حددي تاريخ البداية والنهاية."; return; }
+    if (a < todayISO) { c.textContent = "لا يمكن اختيار يوم مضى."; return; }
     if (b < a) { c.textContent = "تاريخ النهاية قبل تاريخ البداية."; return; }
     const n = workDays(a, b);
     c.textContent = "مدة الغياب: " + n + (n === 1 ? " يوم دوام" : " أيام دوام") + " (بدون الجمعة والسبت)";
   } else {
     const d = $("f-pdate").value, n = d ? periodsInDay(d) : 0;
     if (!d) { c.textContent = "اختاري تاريخ الاستئذان."; return; }
+    if (d < todayISO) { c.textContent = "لا يمكن اختيار يوم مضى."; return; }
     if (!n) { c.textContent = "هذا اليوم إجازة نهاية الأسبوع."; return; }
     const ps = [...chosen].sort((a, b) => a - b);
     c.textContent = ps.length ? "الاستئذان: " + periodsText(ps) + " — " + ps.length + " من " + n + " حصص" : "اختاري حصة أو أكثر (" + AR_DAY.format(parse(d)) + ": " + n + " حصص).";
@@ -535,9 +540,11 @@ $("f").addEventListener("submit", async ev => {
   if (type === "absence") {
     r.date_from = $("f-from").value; r.date_to = $("f-to").value || r.date_from; r.reason = $("f-areason").value;
     if (!r.date_from || r.date_to < r.date_from) return showMsg(msg, "راجعي تواريخ الغياب.", false);
+    if (r.date_from < todayISO) return showMsg(msg, "لا يمكن تسجيل غياب في يوم مضى. اختاري اليوم أو تاريخًا قادمًا.", false);
   } else {
     r.date_from = $("f-pdate").value; r.reason = $("f-preason").value; r.periods = [...chosen].sort((a, b) => a - b);
     if (!r.date_from) return showMsg(msg, "اختاري تاريخ الاستئذان.", false);
+    if (r.date_from < todayISO) return showMsg(msg, "لا يمكن تسجيل استئذان في يوم مضى. اختاري اليوم أو تاريخًا قادمًا.", false);
     if (!periodsInDay(r.date_from)) return showMsg(msg, "هذا اليوم إجازة نهاية الأسبوع.", false);
     if (!r.periods.length) return showMsg(msg, "اختاري حصة واحدة على الأقل.", false);
   }
@@ -547,6 +554,7 @@ $("f").addEventListener("submit", async ev => {
     if (error) throw error;
     if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات."
       : data.error === "no_school" ? "هذا اليوم إجازة نهاية الأسبوع."
+      : data.error === "past_date" ? "لا يمكن التسجيل في يوم مضى. اختاري اليوم أو تاريخًا قادمًا."
       : data.error === "bad_periods" ? "اختيار الحصص غير صحيح لهذا اليوم."
       : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
     chosen.clear(); renderPeriods();
