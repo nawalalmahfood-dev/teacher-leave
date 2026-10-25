@@ -137,13 +137,13 @@ footer{text-align:center}
 
   <!-- ========== Teacher sign-in ========== -->
   <form class="sheet narrow" id="t-login" novalidate>
-    <h2>دخول المعلمة</h2>
-    <label>اسمك<select id="t-who"><option value="">جارٍ تحميل الأسماء…</option></select></label>
-    <label>رمزك (4 أرقام)<input id="t-pin" class="pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"></label>
+    <h2>تسجيل الدخول</h2>
+    <label>رقم الجوال<input id="t-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="05xxxxxxxx" maxlength="16"></label>
+    <label>رمز التحقق (4 أرقام)<input id="t-pin" class="pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"></label>
     <label style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" id="t-remember" style="width:auto" checked> تذكّريني على هذا الجهاز</label>
     <button class="btn" type="submit" id="t-go">دخول</button>
     <span class="msg" id="t-msg" hidden></span>
-    <p class="hint">لا تعرفين رمزك؟ اطلبيه من الإدارة.</p>
+    <p class="hint">رمز التحقق يصلك من الإدارة على الواتساب. لا تعرفينه؟ اطلبيه من الإدارة.</p>
   </form>
 
   <!-- ========== Teacher area ========== -->
@@ -195,25 +195,14 @@ footer{text-align:center}
     </div>
   </section>
 
-  <!-- ========== Admin sign-in ========== -->
-  <form class="sheet narrow" id="a-login" novalidate hidden>
-    <h2>دخول الإدارة</h2>
-    <label id="a-name-wrap">الاسم<select id="a-name"><option value="">جارٍ تحميل الأسماء…</option></select></label>
-    <label id="a-email-wrap" hidden>البريد الإلكتروني<input type="email" id="a-email" autocomplete="username" dir="ltr"></label>
-    <label>كلمة المرور<input type="password" id="a-pass" autocomplete="current-password" dir="ltr"></label>
-    <button class="btn" type="submit" id="a-go">دخول</button>
-    <span class="msg" id="a-msg" hidden></span>
-    <button class="link" type="button" id="a-mode">الدخول بالبريد الإلكتروني بدلًا من الاسم</button>
-  </form>
-
   <!-- ========== Admin area ========== -->
   <section id="admin" class="list" style="gap:16px" hidden>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="day" aria-selected="true">لوحة اليوم</button>
       <button role="tab" data-tab="all" aria-selected="false">كل الطلبات</button>
       <button role="tab" data-tab="sum" aria-selected="false">ملخص المعلمات</button>
-      <button role="tab" data-tab="staff" aria-selected="false">المعلمات والرموز</button>
-      <button role="tab" data-tab="admins" aria-selected="false">حسابات الإدارة</button>
+      <button role="tab" data-tab="staff" aria-selected="false" data-mgr>المعلمات والصلاحيات</button>
+      <button role="tab" data-tab="mine" aria-selected="false">طلباتي</button>
     </nav>
 
     <section id="p-day" class="list" style="gap:16px">
@@ -247,7 +236,7 @@ footer{text-align:center}
         <thead><tr><th>المعلمة</th><th>التخصص</th><th>أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
         <tbody id="sum-body"></tbody>
       </table></div>
-      <form class="sheet" id="lim" novalidate>
+      <form class="sheet" id="lim" novalidate data-mgr>
         <h2>حدود التنبيه للمعلمات</h2>
         <p class="hint">تظهر للمعلمة رسالة تنبيه عندما يصل غيابها أو استئذانها في العام الدراسي إلى هذه الحدود.</p>
         <div class="limits">
@@ -292,40 +281,22 @@ footer{text-align:center}
         <div class="grid">
           <label>الاسم<input id="n-name" maxlength="120"></label>
           <label>التخصص<input id="n-spec" maxlength="80"></label>
-          <label>الجوال<input id="n-phone" inputmode="tel" maxlength="20" dir="ltr"></label>
-          <label>الرمز (4 أرقام)<input id="n-pin" class="pin" inputmode="numeric" maxlength="4"></label>
+          <label>الجوال<input id="n-phone" inputmode="tel" maxlength="20" dir="ltr" placeholder="05xxxxxxxx"></label>
+          <label>الرمز (اختياري)<input id="n-pin" class="pin" inputmode="numeric" maxlength="4"></label>
         </div>
         <div class="row"><button class="btn sm" type="submit">إضافة</button><button class="btn ghost sm" type="button" id="n-rand">رمز عشوائي</button><span class="msg" id="n-msg" hidden></span></div>
-        <p class="hint">احتفظي بالرمز وأعطيه للمعلمة. لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
+        <p class="hint">اتركي الرمز فارغًا ليُنشأ تلقائيًا. الرمز لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
       </form>
+      <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب ومرات الاستئذان المعتمدة قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وتظهر لها وللإدارة.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
 
-    <section id="p-admins" class="list" style="gap:14px" hidden>
-      <form class="sheet" id="adm" novalidate>
-        <h2>إضافة حساب إداري</h2>
-        <p class="hint">صاحبة الحساب الإداري ترى كل الطلبات وتعتمدها، وتضيف المعلمات وتغيّر الرموز. تدخل من «دخول الإدارة» باختيار اسمها (الاسم الظاهر) وكتابة كلمة المرور. البريد يُستخدم فقط لتفعيل الحساب.</p>
-        <div class="grid">
-          <label>المعلمة<select id="ad-teacher"><option value="">— اختاري من القائمة أو اكتبي الاسم —</option></select></label>
-          <label>الاسم الظاهر<input id="ad-label" maxlength="120"></label>
-          <label>البريد الإلكتروني<input type="email" id="ad-email" dir="ltr" autocomplete="off"></label>
-          <label>كلمة المرور (8 أحرف على الأقل)<input type="text" id="ad-pass" dir="ltr" autocomplete="new-password"></label>
-        </div>
-        <div class="row"><button class="btn sm" type="submit" id="ad-go">إنشاء الحساب</button><span class="msg" id="ad-msg" hidden></span></div>
-        <p class="hint">إذا كان للبريد حساب سابق في نظامك، يُمنح صلاحية الإدارة بكلمة مروره الحالية، ولا تُستخدم كلمة المرور المكتوبة هنا.</p>
-      </form>
-      <div class="tablebox"><table>
-        <thead><tr><th>الاسم</th><th>البريد</th><th>الحالة</th><th></th></tr></thead>
-        <tbody id="ad-body"></tbody>
-      </table></div>
-    </section>
   </section>
 
-  <footer><button class="link" id="switch">دخول الإدارة</button></footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -405,33 +376,30 @@ const ORD = ["", "الأولى", "الثانية", "الثالثة", "الراب
 const periodsText = ps => (ps.length === 1 ? "الحصة " : "الحصص: ") + ps.map(p => ORD[p] || p).join("، ");
 
 // ---------- view switching ----------
-let mode = location.hash === "#admin" ? "admin" : "teacher";
+const ROLE_NAME = { teacher: "معلمة", viewer: "اطلاع فقط", editor: "اطلاع وحذف", manager: "مديرة" };
+let myRole = "teacher";
+const isStaff = () => myRole !== "teacher";
+const canCancel = () => myRole === "editor" || myRole === "manager";
+const isMgr = () => myRole === "manager";
+// view: "login" | "teacher" | "staff" (staff also reach their own requests through the «طلباتي» tab)
 function show(view) {
-  ["t-login", "teacher", "a-login", "admin"].forEach(id => $(id).hidden = id !== view);
-  $("switch").textContent = mode === "admin" ? "دخول المعلمات" : "دخول الإدارة";
-  $("logout").hidden = !(view === "teacher" || view === "admin");
-  $("role").hidden = $("logout").hidden;
-  $("role").textContent = view === "admin" ? "الإدارة" : (session ? session.name : "");
+  $("t-login").hidden = view !== "login";
+  $("teacher").hidden = view !== "teacher";
+  $("admin").hidden = view !== "staff";
+  $("logout").hidden = view === "login";
+  $("role").hidden = view === "login";
+  $("role").textContent = session ? session.name + (isStaff() ? " · " + ROLE_NAME[myRole] : "") : "";
+  document.querySelectorAll("[data-mgr]").forEach(e => e.hidden = !isMgr());
 }
-$("switch").onclick = () => { mode = mode === "admin" ? "teacher" : "admin"; history.replaceState(null, "", mode === "admin" ? "#admin" : location.pathname); boot(); };
-$("logout").onclick = async () => {
-  if (mode === "admin") { await sb.auth.signOut(); stopPoll(); }
-  else { session = null; store.del("leave.session"); $("t-pin").value = ""; }
+$("logout").onclick = () => {
+  stopPoll(); session = null; myRole = "teacher"; store.del("leave.session"); $("t-pin").value = "";
   boot();
 };
 
 // ================= TEACHER =================
-let session = null;   // {id, pin, name}
+let session = null;   // {id, pin, name, role}
 let tData = null;
 
-async function loadTeachers() {
-  const { data, error } = await sb.rpc("leave_public_teachers");
-  const sel = $("t-who"); sel.replaceChildren();
-  if (error) { sel.append(el("option", null, "تعذّر تحميل الأسماء، أعيدي فتح الصفحة")); return; }
-  sel.append(el("option", null, data.length ? "اختاري اسمك" : "لم تُضف الإدارة أسماء المعلمات بعد"));
-  sel.firstChild.value = "";
-  data.forEach(t => { const o = el("option", null, t.name); o.value = t.id; sel.append(o); });
-}
 async function fetchTeacher() {
   const { data, error } = await sb.rpc("leave_teacher_data", { p_teacher: session.id, p_pin: session.pin });
   if (error) throw error;
@@ -440,24 +408,28 @@ async function fetchTeacher() {
 $("t-pin").addEventListener("input", e => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4));
 $("t-login").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const id = $("t-who").value, pin = $("t-pin").value, m = $("t-msg");
-  if (!id) return showMsg(m, "اختاري اسمك من القائمة.", false);
-  if (!/^\d{4}$/.test(pin)) return showMsg(m, "الرمز 4 أرقام.", false);
+  const phone = normPhone($("t-phone").value), pin = $("t-pin").value, m = $("t-msg");
+  if (phone.length < 9) return showMsg(m, "اكتبي رقم جوالك.", false);
+  if (!/^\d{4}$/.test(pin)) return showMsg(m, "رمز التحقق 4 أرقام.", false);
   $("t-go").disabled = true;
-  session = { id, pin, name: $("t-who").selectedOptions[0].textContent };
   try {
-    const d = await fetchTeacher();
-    if (d.error) { session = null; return showMsg(m, d.error === "locked" ? "تم إيقاف الدخول مؤقتًا بعد عدة محاولات خاطئة. حاولي بعد 15 دقيقة أو راجعي الإدارة." : "الرمز غير صحيح.", false); }
+    const { data: d, error } = await sb.rpc("leave_login", { p_phone: phone, p_pin: pin });
+    if (error) throw error;
+    if (d.error) return showMsg(m, d.error === "locked" ? "تم إيقاف الدخول مؤقتًا بعد عدة محاولات خاطئة. حاولي بعد 15 دقيقة أو راجعي الإدارة."
+      : d.error === "no_phone" ? "رقم الجوال غير مسجّل في المنصة. راجعي الإدارة." : "رمز التحقق غير صحيح.", false);
     m.hidden = true;
+    session = { id: d.teacher_id, pin, name: d.name, role: d.role };
     if ($("t-remember").checked) store.set("leave.session", JSON.stringify(session));
-    tData = d; renderTeacher(); show("teacher");
-  } catch (e) { session = null; showMsg(m, "تعذّر الاتصال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
+    $("t-pin").value = "";
+    boot();
+  } catch (e) { showMsg(m, "تعذّر الاتصال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
   finally { $("t-go").disabled = false; }
 });
 
 function renderTeacher() {
   if (tData.limits) limits = tData.limits;
-  session.name = tData.teacher.name; $("role").textContent = session.name;
+  session.name = tData.teacher.name; myRole = tData.teacher.role || "teacher";
+  $("role").textContent = session.name + (isStaff() ? " · " + ROLE_NAME[myRole] : "");
   const reqs = tData.requests || [];
   const s = tally(reqs, tData.teacher), lv = level(s);
   $("m-days").textContent = s.days; $("m-perms").textContent = s.perms;
@@ -584,8 +556,8 @@ function card(r, opts) {
   c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")));
   if (opts.admin) {
     const act = el("div", "act");
-    if (isAbs) {
-      // recorded absences have no approval step
+    if (isAbs || !isMgr()) {
+      // recorded absences have no approval step; only managers approve early leave
     } else if (r.status === "pending") {
       const note = el("input", "note-in"); note.placeholder = "ملاحظة للمعلمة (اختياري)"; note.id = "n-" + r.id; note.maxLength = 300;
       const ok = el("button", "btn ok sm", "اعتماد"), no = el("button", "btn no sm", "رفض");
@@ -596,19 +568,21 @@ function card(r, opts) {
       const undo = el("button", "btn ghost sm", "إعادة إلى الانتظار");
       undo.onclick = () => decide(r, "pending", "", act); act.append(undo);
     }
-    // Admin can cancel any absence or early-leave request; it then drops out of every list and count.
-    const kill = el("button", "btn no sm", isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان");
-    kill.style.marginInlineStart = "auto";
-    let armed = false;
-    kill.onclick = async () => {
-      if (!armed) { armed = true; kill.textContent = "تأكيد الإلغاء؟"; setTimeout(() => { armed = false; kill.textContent = isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان"; }, 5000); return; }
-      act.querySelectorAll("button").forEach(x => x.disabled = true);
-      const { error } = await sb.from("leave_requests").update({ cancelled_at: new Date().toISOString() }).eq("id", r.id);
-      if (error) { act.querySelectorAll("button").forEach(x => x.disabled = false); act.append(el("span", "msg bad", "تعذّر الإلغاء.")); return; }
-      loadAdmin();
-    };
-    act.append(kill);
-    c.append(act);
+    // Editors and managers can cancel any absence or early-leave request; it then drops out of every list and count.
+    if (canCancel()) {
+      const kill = el("button", "btn no sm", isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان");
+      kill.style.marginInlineStart = "auto";
+      let armed = false;
+      kill.onclick = async () => {
+        if (!armed) { armed = true; kill.textContent = "تأكيد الإلغاء؟"; setTimeout(() => { armed = false; kill.textContent = isAbs ? "إلغاء الغياب" : "إلغاء الاستئذان"; }, 5000); return; }
+        act.querySelectorAll("button").forEach(x => x.disabled = true);
+        try { await staff("cancel", { request_id: r.id }); }
+        catch (e) { act.querySelectorAll("button").forEach(x => x.disabled = false); act.append(el("span", "msg bad", "تعذّر الإلغاء.")); return; }
+        loadAdmin();
+      };
+      act.append(kill);
+    }
+    if (act.childNodes.length) c.append(act);
   } else if (opts.mine && (r.status === "pending" || (isAbs && r.date_from >= todayISO))) {
     const act = el("div", "act"), cancel = el("button", "btn ghost sm", isAbs ? "إلغاء الغياب" : "إلغاء الطلب");
     let armed = false;
@@ -628,63 +602,34 @@ function card(r, opts) {
 
 // ================= ADMIN =================
 let teachers = new Map(), reqs = [], tallies = new Map(), pollId = null;
+// Every staff action goes through one RPC that checks the signed-in person's code and role.
+async function staff(action, args) {
+  const { data, error } = await sb.rpc("leave_staff", { p_actor: session.id, p_pin: session.pin, p_action: action, p_args: args || {} });
+  if (error) throw error;
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
 const stopPoll = () => { if (pollId) clearInterval(pollId); pollId = null; };
 
-let byEmail = false;
-$("a-mode").onclick = () => {
-  byEmail = !byEmail;
-  $("a-name-wrap").hidden = byEmail; $("a-email-wrap").hidden = !byEmail;
-  $("a-mode").textContent = byEmail ? "الدخول بالاسم" : "الدخول بالبريد الإلكتروني بدلًا من الاسم";
-};
-async function loadAdminNames() {
-  const sel = $("a-name"), { data, error } = await sb.rpc("leave_public_admins");
-  sel.replaceChildren();
-  if (error) { sel.append(el("option", null, "تعذّر تحميل الأسماء")); sel.firstChild.value = ""; return; }
-  sel.append(el("option", null, "اختاري اسمك")); sel.firstChild.value = "";
-  data.forEach(a => { const o = el("option", null, a.label); o.value = a.label; sel.append(o); });
-}
-$("a-login").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  const m = $("a-msg"), password = $("a-pass").value;
-  if (!password) return showMsg(m, "اكتبي كلمة المرور.", false);
-  $("a-go").disabled = true;
-  try {
-    if (byEmail) {
-      const { error } = await sb.auth.signInWithPassword({ email: $("a-email").value.trim(), password });
-      if (error) return showMsg(m, "البريد أو كلمة المرور غير صحيحة.", false);
-    } else {
-      const name = $("a-name").value;
-      if (!name) return showMsg(m, "اختاري اسمك من القائمة.", false);
-      const res = await fetch(SB_URL + "/functions/v1/leave-admin-login", {
-        method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY }, body: JSON.stringify({ name, password })
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.access_token) return showMsg(m, d.error === "rate_limited" ? "محاولات كثيرة، انتظري دقائق ثم حاولي." : "الاسم أو كلمة المرور غير صحيحة.", false);
-      const { error } = await sb.auth.setSession({ access_token: d.access_token, refresh_token: d.refresh_token });
-      if (error) throw error;
-    }
-    m.hidden = true; $("a-pass").value = ""; boot();
-  } catch (e) { showMsg(m, "تعذّر الاتصال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
-  finally { $("a-go").disabled = false; }
-});
 
 async function loadAdmin() {
-  const [t, r, s] = await Promise.all([
-    sb.from("leave_teachers").select("id,name,specialty,phone,active,locked_until,prior_days,prior_perms,prior_year").is("removed_at", null).order("name"),
-    sb.from("leave_requests").select("*").is("cancelled_at", null).order("date_from", { ascending: false }).limit(5000),
-    sb.from("leave_settings").select("abs_warn,abs_max,perm_warn,perm_max").eq("id", 1).maybeSingle()
-  ]);
-  if (t.error || r.error) { showMsg($("notice"), "تعذّر تحميل البيانات. اضغطي «تحديث».", false); return; }
+  let d;
+  try { d = await staff("load"); }
+  catch (e) {
+    if (/forbidden|bad_login|locked/.test(e.message)) { $("logout").onclick(); return; }
+    showMsg($("notice"), "تعذّر تحميل البيانات. اضغطي «تحديث».", false); return;
+  }
   $("notice").hidden = true;
-  teachers = new Map(t.data.map(x => [x.id, x]));
-  reqs = r.data.filter(x => teachers.has(x.teacher_id));
-  if (s.data) limits = s.data;
+  if (d.role !== myRole) { myRole = d.role; show("staff"); }
+  teachers = new Map(d.teachers.map(x => [x.id, x]));
+  reqs = d.requests.filter(x => teachers.has(x.teacher_id));
+  if (d.limits) limits = d.limits;
   Object.keys(limits).forEach(k => { const i = $("l-" + k); if (i && document.activeElement !== i) i.value = limits[k]; });
   const by = new Map(); reqs.forEach(x => { if (!by.has(x.teacher_id)) by.set(x.teacher_id, []); by.get(x.teacher_id).push(x); });
   tallies = new Map([...teachers.keys()].map(id => [id, tally(by.get(id) || [], teachers.get(id))]));
   renderAdmin();
 }
-function renderAdmin() { renderDay(); renderAll(); renderSum(); renderStaff(); }
+function renderAdmin() { renderDay(); renderAll(); renderSum(); if (isMgr()) renderStaff(); }
 
 function renderDay() {
   const day = $("d-date").value || todayISO;
@@ -721,13 +666,24 @@ function renderSum() {
 }
 function renderStaff() {
   const body = $("staff-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 8; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
+    const me = t.id === session.id;
     const tr = el("tr");
     tr.append(el("td", null, t.name), el("td", null, t.specialty || "—"));
     const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
+    const roleTd = el("td"), rs = el("select"); rs.id = "role-" + t.id; rs.style.width = "auto";
+    Object.entries(ROLE_NAME).forEach(([k, v]) => { const o = el("option", null, v); o.value = k; rs.append(o); });
+    rs.value = t.role || "teacher"; rs.disabled = me; if (me) rs.title = "لا يمكنك تغيير صلاحيتك";
+    rs.onchange = async () => {
+      rs.disabled = true;
+      try { await staff("set_role", { teacher_id: t.id, role: rs.value }); t.role = rs.value; }
+      catch (e) { rs.value = t.role || "teacher"; }
+      rs.disabled = false;
+    };
+    roleTd.append(rs); tr.append(roleTd);
     const priorTd = el("td"), pw = el("div", "inline-in");
     const cur = t.prior_year === yStartY;
     const pd = el("input"); pd.type = "number"; pd.min = "0"; pd.max = "365"; pd.value = cur ? t.prior_days : 0; pd.title = "أيام غياب سابقة"; pd.style.width = "64px"; pd.id = "pd-" + t.id;
@@ -736,45 +692,49 @@ function renderStaff() {
     ps.onclick = async () => {
       const d = Math.max(0, Math.round(+pd.value || 0)), q = Math.max(0, Math.round(+pp.value || 0));
       ps.disabled = true;
-      const { error } = await sb.rpc("leave_admin_set_prior", { p_teacher: t.id, p_days: d, p_perms: q, p_year: yStartY });
-      ps.disabled = false; ps.textContent = error ? "تعذّر" : "تم ✓";
-      if (!error) setTimeout(loadAdmin, 600);
+      let ok = true;
+      try { await staff("set_prior", { teacher_id: t.id, days: d, perms: q, year: yStartY }); } catch (e) { ok = false; }
+      ps.disabled = false; ps.textContent = ok ? "تم ✓" : "تعذّر";
+      if (ok) setTimeout(loadAdmin, 600);
     };
     pw.append(pd, el("span", "hint", "/"), pp, ps); priorTd.append(pw); tr.append(priorTd);
     const pinTd = el("td"), wrap = el("div", "inline-in"), pin = el("input", "pin"); pin.inputMode = "numeric"; pin.maxLength = 4; pin.placeholder = "••••"; pin.id = "pin-" + t.id;
     pin.addEventListener("input", () => pin.value = pin.value.replace(/\D/g, "").slice(0, 4));
-    const save = el("button", "btn ghost sm", "حفظ");
+    pin.placeholder = "تلقائي";
+    const save = el("button", "btn ghost sm", "رمز جديد");
     save.onclick = async () => {
-      if (!/^\d{4}$/.test(pin.value)) { pin.focus(); return; }
+      if (pin.value && !/^\d{4}$/.test(pin.value)) { pin.focus(); return; }
       save.disabled = true;
-      const { error } = await sb.rpc("leave_admin_set_pin", { p_teacher: t.id, p_pin: pin.value });
+      let res = null;
+      try { res = await staff("set_pin", { teacher_id: t.id, pin: pin.value }); } catch (e) {}
       save.disabled = false;
-      if (error) { save.textContent = "تعذّر"; return; }
-      const newPin = pin.value; pin.value = ""; save.textContent = "تم ✓";
-      const wa = waLink(t.phone, t.name, newPin);
+      if (!res) { save.textContent = "تعذّر"; return; }
+      pin.value = ""; save.textContent = "الرمز: " + res.pin;
+      if (me) { session.pin = res.pin; if (store.get("leave.session")) store.set("leave.session", JSON.stringify(session)); }
+      const wa = waLink(t.phone, t.name, res.pin);
       if (wa) wrap.append(wa);
     };
     wrap.append(pin, save); pinTd.append(wrap); tr.append(pinTd);
     const tog = el("td"), b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
-    b.onclick = async () => { b.disabled = true; await sb.from("leave_teachers").update({ active: !t.active }).eq("id", t.id); loadAdmin(); };
+    b.onclick = async () => { b.disabled = true; try { await staff("set_active", { teacher_id: t.id, active: !t.active }); } catch (e) {} loadAdmin(); };
     const del = el("button", "link", "حذف"); del.style.color = "var(--absent)";
     let armed = false;
     del.onclick = async () => {
       if (!armed) { armed = true; del.textContent = "تأكيد حذف " + t.name + "؟"; setTimeout(() => { armed = false; del.textContent = "حذف"; }, 5000); return; }
       del.disabled = true;
-      const { error } = await sb.rpc("leave_admin_remove_teacher", { p_teacher: t.id });
-      if (error) { del.disabled = false; del.textContent = "تعذّر الحذف"; return; }
+      try { await staff("remove_teacher", { teacher_id: t.id }); }
+      catch (e) { del.disabled = false; del.textContent = "تعذّر الحذف"; return; }
       loadAdmin();
     };
-    tog.style.whiteSpace = "nowrap"; tog.append(b, el("span", "hint", " · "), del); tr.append(tog);
+    tog.style.whiteSpace = "nowrap"; if (!me) tog.append(b, el("span", "hint", " · "), del); tr.append(tog);
     body.append(tr);
   });
 }
 
 async function decide(r, status, note, act) {
   act.querySelectorAll("button").forEach(b => b.disabled = true);
-  const { error } = await sb.from("leave_requests").update({ status, admin_note: (note || "").trim(), decided_at: status === "pending" ? null : new Date().toISOString() }).eq("id", r.id);
-  if (error) { act.querySelectorAll("button").forEach(b => b.disabled = false); act.append(el("span", "msg bad", "تعذّر الحفظ.")); return; }
+  try { await staff("decide", { request_id: r.id, status, note: (note || "").trim() }); }
+  catch (e) { act.querySelectorAll("button").forEach(b => b.disabled = false); act.append(el("span", "msg bad", "تعذّر الحفظ.")); return; }
   loadAdmin();
 }
 
@@ -789,7 +749,7 @@ function normPhone(v) {
 }
 function waLink(phone, name, pin) {
   const d = normPhone(phone); if (d.length < 9) return null;
-  const text = "السلام عليكم أ. " + name + "\nرابط تسجيل الغياب والاستئذان:\n" + SITE_URL + "\nاختاري اسمك واكتبي رمزك: " + pin;
+  const text = "السلام عليكم أ. " + name + "\nرابط تسجيل الغياب والاستئذان:\n" + SITE_URL + "\nادخلي برقم جوالك ورمز التحقق: " + pin;
   const a = el("a", "wa", "واتساب"); a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(text); a.target = "_blank"; a.rel = "noopener";
   return a;
 }
@@ -847,9 +807,10 @@ function previewImport() {
 $("x-go").onclick = async () => {
   const list = importRows(); if (!list.length) return;
   $("x-go").disabled = true; showMsg($("x-msg"), "جارٍ الاستيراد…", true);
-  const { data, error } = await sb.rpc("leave_admin_import", { p_rows: list });
+  let data;
+  try { data = (await staff("import", { rows: list })).rows; } catch (e) { data = null; }
   $("x-go").disabled = false;
-  if (error) return showMsg($("x-msg"), "تعذّر الاستيراد. حاولي مرة أخرى.", false);
+  if (!data) return showMsg($("x-msg"), "تعذّر الاستيراد. حاولي مرة أخرى.", false);
   $("x-msg").hidden = true; $("x-map").hidden = true; $("x-file").value = "";
   const added = data.filter(r => r.status === "added"), skipped = data.length - added.length;
   showPins(added, "تمت إضافة " + added.length + " معلمة." + (skipped ? " وتم تجاهل " + skipped + " لأن أسماءهن موجودة مسبقًا." : ""));
@@ -878,11 +839,12 @@ $("bulk-pin").onclick = async () => {
     showMsg(m, "الرموز القديمة ستتوقف، وتحتاجين ترسلين الرموز الجديدة لكل المعلمات.", false); return;
   }
   $("bulk-pin").disabled = true; $("bulk-cancel").hidden = true;
-  const { data, error } = await sb.rpc("leave_admin_reset_all_pins");
+  let data;
+  try { data = (await staff("reset_all_pins")).rows; } catch (e) { data = null; }
   $("bulk-pin").disabled = false; bulkArmed = false; $("bulk-pin").textContent = "إنشاء رموز جديدة للجميع";
-  if (error) return showMsg(m, "تعذّر إنشاء الرموز. حاولي مرة أخرى.", false);
+  if (!data) return showMsg(m, "تعذّر إنشاء الرموز. حاولي مرة أخرى.", false);
   m.hidden = true;
-  showPins(data, "تم إنشاء رموز جديدة لـ " + data.length + " معلمة.");
+  showPins(data, "تم إنشاء رموز جديدة لـ " + data.length + " معلمة (رمزك أنتِ لم يتغير).");
   loadAdmin();
 };
 $("x-csv").onclick = () => csvDownload([["المعلمة", "الجوال", "الرمز"], ...xResult.map(r => [r.name, r.phone, r.pin])], "رموز-المعلمات-" + todayISO + ".csv");
@@ -893,65 +855,18 @@ $("add").addEventListener("submit", async ev => {
   ev.preventDefault();
   const m = $("n-msg"), name = $("n-name").value.trim(), pin = $("n-pin").value;
   if (name.length < 2) return showMsg(m, "اكتبي اسم المعلمة.", false);
-  if (!/^\d{4}$/.test(pin)) return showMsg(m, "الرمز 4 أرقام.", false);
-  const { data: newId, error } = await sb.rpc("leave_admin_add_teacher", { p_name: name, p_specialty: $("n-spec").value.trim(), p_pin: pin });
-  if (error) return showMsg(m, "تعذّرت الإضافة.", false);
+  if (pin && !/^\d{4}$/.test(pin)) return showMsg(m, "الرمز 4 أرقام، أو اتركيه فارغًا.", false);
   const phone = normPhone($("n-phone").value);
-  if (phone) await sb.rpc("leave_admin_set_phone", { p_teacher: newId, p_phone: phone });
-  showMsg(m, "تمت إضافة " + name + " — رمزها: " + pin, true);
-  const wa = waLink(phone, name, pin); if (wa) { wa.style.marginInlineStart = "8px"; m.append(wa); }
+  if (phone.length < 9) return showMsg(m, "اكتبي رقم جوال المعلمة، فهو اسم الدخول.", false);
+  let res;
+  try { res = await staff("add_teacher", { name, specialty: $("n-spec").value.trim(), phone, pin }); }
+  catch (e) { return showMsg(m, "تعذّرت الإضافة.", false); }
+  showMsg(m, "تمت إضافة " + name + " — رمزها: " + res.pin, true);
+  const wa = waLink(phone, name, res.pin); if (wa) { wa.style.marginInlineStart = "8px"; m.append(wa); }
   $("n-name").value = ""; $("n-spec").value = ""; $("n-phone").value = ""; $("n-pin").value = "";
   loadAdmin();
 });
 
-// ---------- admin accounts ----------
-const signupClient = supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "leave-signup" } });
-async function loadAdmins() {
-  const sel = $("ad-teacher"), keep = sel.value; sel.replaceChildren(el("option", null, "— اختاري من القائمة أو اكتبي الاسم —")); sel.firstChild.value = "";
-  [...teachers.values()].forEach(t => { const o = el("option", null, t.name); o.value = t.name; sel.append(o); }); sel.value = keep;
-  const body = $("ad-body"); body.replaceChildren();
-  const { data, error } = await sb.rpc("leave_admin_list");
-  if (error) { const tr = el("tr"), td = el("td", null, "تعذّر تحميل الحسابات."); td.colSpan = 4; tr.append(td); body.append(tr); return; }
-  data.forEach(a => {
-    const tr = el("tr"), em = el("td", null, a.email); em.dir = "ltr"; em.style.textAlign = "right";
-    tr.append(el("td", null, (a.label || "—") + (a.is_me ? " (أنتِ)" : "")), em);
-    const st = el("td"); st.append(el("span", "st " + (!a.active ? "rejected" : a.confirmed ? "approved" : "pending"), !a.active ? "موقوف" : a.confirmed ? "فعّال" : "بانتظار تفعيل البريد")); tr.append(st);
-    const act = el("td");
-    if (!a.is_me) {
-      const b = el("button", "link", a.active ? "إيقاف الصلاحية" : "إعادة الصلاحية");
-      b.onclick = async () => { b.disabled = true; await sb.rpc("leave_admin_set_active", { p_user: a.user_id, p_active: !a.active }); loadAdmins(); };
-      act.append(b);
-    }
-    tr.append(act); body.append(tr);
-  });
-}
-$("ad-teacher").addEventListener("change", () => { if ($("ad-teacher").value) $("ad-label").value = $("ad-teacher").value; });
-$("adm").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  const m = $("ad-msg"), email = $("ad-email").value.trim().toLowerCase(), pass = $("ad-pass").value, label = $("ad-label").value.trim();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(m, "اكتبي بريدًا إلكترونيًا صحيحًا.", false);
-  if (!label) return showMsg(m, "اختاري المعلمة أو اكتبي الاسم.", false);
-  $("ad-go").disabled = true;
-  try {
-    let { data: res, error } = await sb.rpc("leave_admin_grant", { p_email: email, p_label: label });
-    if (error) throw error;
-    let pending = false;
-    if (res === "no_account") {
-      if (pass.length < 8) return showMsg(m, "كلمة المرور يجب أن تكون 8 أحرف على الأقل.", false);
-      const su = await signupClient.auth.signUp({ email, password: pass, options: { emailRedirectTo: SITE_URL + "#admin" } });
-      if (su.error) return showMsg(m, "تعذّر إنشاء الحساب: " + (/rate|limit/i.test(su.error.message) ? "محاولات كثيرة، انتظري قليلًا." : su.error.message), false);
-      pending = !su.data.session;
-      ({ data: res, error } = await sb.rpc("leave_admin_grant", { p_email: email, p_label: label }));
-      if (error || res === "no_account") return showMsg(m, "أُنشئ الحساب لكن تعذّر منحه الصلاحية. حاولي مرة أخرى.", false);
-    }
-    showMsg(m, res === "reactivated" ? "أُعيدت صلاحية الإدارة لهذا الحساب."
-      : pending ? "تم إنشاء الحساب. وصلها رابط تفعيل على بريدها، تضغطه ثم تدخل من «دخول الإدارة»."
-      : "تم. تقدر تدخل الآن من «دخول الإدارة» بالبريد وكلمة المرور.", true);
-    $("ad-email").value = ""; $("ad-pass").value = ""; $("ad-label").value = ""; $("ad-teacher").value = "";
-    loadAdmins();
-  } catch (e) { showMsg(m, /duplicate|unique/i.test(e?.message || "") ? "هذا الاسم مستخدم لحساب إداري آخر. اكتبي اسمًا مختلفًا." : "تعذّر الحفظ. حاولي مرة أخرى.", false); }
-  finally { $("ad-go").disabled = false; }
-});
 
 $("lim").addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -959,8 +874,7 @@ $("lim").addEventListener("submit", async ev => {
   const m = $("l-msg");
   if (Object.values(v).some(n => !(n > 0))) return showMsg(m, "اكتبي أرقامًا أكبر من صفر.", false);
   if (v.abs_warn > v.abs_max || v.perm_warn > v.perm_max) return showMsg(m, "التنبيه الأولي يجب أن يكون أقل من التنبيه العالي أو مساويًا له.", false);
-  const { error } = await sb.from("leave_settings").update(v).eq("id", 1);
-  if (error) return showMsg(m, "تعذّر الحفظ.", false);
+  try { await staff("save_limits", v); } catch (e) { return showMsg(m, "تعذّر الحفظ.", false); }
   showMsg(m, "تم حفظ الحدود، وتظهر للمعلمات مباشرة.", true); loadAdmin();
 });
 
@@ -974,8 +888,10 @@ $("a-csv").onclick = () => {
 
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
-  ["day", "all", "sum", "staff", "admins"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
-  if (b.dataset.tab === "admins") loadAdmins();
+  ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
+  // «طلباتي» shows the staff member's own balance, form and requests.
+  $("teacher").hidden = b.dataset.tab !== "mine";
+  if (b.dataset.tab === "mine") renderTeacher();
 }));
 ["a-q", "a-type", "a-st", "a-from", "a-to"].forEach(id => $(id).addEventListener("input", renderAll));
 $("d-date").addEventListener("input", renderDay);
@@ -984,26 +900,26 @@ $("refresh").onclick = loadAdmin;
 // ================= BOOT =================
 async function boot() {
   $("notice").hidden = true;
-  if (mode === "admin") {
-    const { data: { session: s } } = await sb.auth.getSession();
-    if (!s) { show("a-login"); loadAdminNames(); return; }
-    const { data: ok } = await sb.rpc("is_leave_admin");
-    if (!ok) { await sb.auth.signOut(); show("a-login"); loadAdminNames(); showMsg($("a-msg"), "هذا الحساب ليس له صلاحية الإدارة.", false); return; }
-    show("admin"); await loadAdmin();
-    stopPoll(); pollId = setInterval(loadAdmin, 60000);
-    return;
-  }
   stopPoll();
   const saved = store.get("leave.session");
   if (saved && !session) { try { session = JSON.parse(saved); } catch (e) { session = null; } }
   if (session) {
     try {
       const d = await fetchTeacher();
-      if (!d.error) { tData = d; renderTeacher(); show("teacher"); return; }
+      if (!d.error) {
+        tData = d; renderTeacher();
+        if (!isStaff()) { show("teacher"); return; }
+        show("staff");
+        document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
+        ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
+        await loadAdmin();
+        pollId = setInterval(loadAdmin, 60000);
+        return;
+      }
       store.del("leave.session"); session = null;
     } catch (e) { session = null; }
   }
-  show("t-login"); loadTeachers();
+  show("login");
 }
 boot();
 })();
