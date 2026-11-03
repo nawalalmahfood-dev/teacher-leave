@@ -344,8 +344,8 @@ footer{text-align:center}
         <div class="row" style="justify-content:space-between"><h2>ملف الأداء الوظيفي — <span class="yr"></span></h2><span class="hint" id="pm-count"></span></div>
         <p class="hint">أضيفي شواهدك تحت كل بند: ملفًا (PDF أو صورة أو Word، حتى 10 ميجا) أو رابطًا. يظهر الشاهد «تحت المراجعة» حتى تعتمده المديرة أو ترفضه، ويمكنك حذف الشاهد ما لم يُعتمد. التقدير من 1 إلى 5 تضعه المقيّمة في المراجعة النصف سنوية والنهائية، ويظهر لك هنا.</p>
         <div class="stats">
-          <div class="stat"><b id="pm-mid">—</b><span>تقدير المراجعة النصف سنوية</span></div>
-          <div class="stat"><b id="pm-final">—</b><span>تقدير المراجعة النهائية</span></div>
+          <div class="stat"><b id="pm-mid">—</b><span>التقدير العام — المراجعة النصف سنوية</span></div>
+          <div class="stat"><b id="pm-final">—</b><span>التقدير العام — المراجعة النهائية</span></div>
         </div>
       </div>
       <div id="pm-elements" class="list"></div>
@@ -378,7 +378,7 @@ footer{text-align:center}
         <div class="sheet">
           <div class="row" style="justify-content:space-between"><h2 id="pr-name"></h2><span class="hint" id="pr-count"></span></div>
           <div class="stats">
-            <div class="stat"><b class="grade" id="pr-avg">—</b><span>متوسط البنود المقدّرة (من 5)</span></div>
+            <div class="stat"><b class="grade" id="pr-avg">—</b><span>مجموع الدرجات (من 280)</span></div>
             <div class="stat"><b class="grade" id="pr-pct">—</b><span>التقدير العام</span></div>
             <div class="stat"><b class="grade" id="pr-done">0</b><span>بنود مقدّرة من 56</span></div>
           </div>
@@ -1064,9 +1064,10 @@ async function openEvidence(r) {
   try { const { url } = await filesFn({ action: "open", report_id: r.id }); if (w) w.location = url; else location.href = url; }
   catch (e) { if (w) w.close(); showMsg($("notice"), "تعذّر فتح الملف. حاولي مرة أخرى.", false); }
 }
-const avg = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-const fmtAvg = v => v == null ? "—" : (Math.round(v * 100) / 100).toString();
-const pct = v => v == null ? "—" : Math.round(v / 5 * 100) + "٪";
+// Grades count every item on the form: an item with no score counts as 0, so the total is out of items × 5.
+const sumOf = xs => xs.reduce((a, b) => a + b, 0);
+const PERF_MAX = PERF_TOTAL * 5;
+const fmtPct = (sum, max) => (Math.round(sum / max * 1000) / 10).toString().replace(/\.0$/, "") + "٪";
 function scoreMap(scores) { const m = { mid: new Map(), final: new Map() }; (scores || []).forEach(x => m[x.period].set(x.item_code, x.score)); return m; }
 
 const EV_ST = { pending: ["pending", "تحت المراجعة"], approved: ["approved", "معتمد"], rejected: ["rejected", "مرفوض"] };
@@ -1131,7 +1132,8 @@ function renderElements(box, opts) {
     meta.append(el("span", "st " + (evN ? "approved" : "pending"), evN + " شاهد"));
     if (pendN) meta.append(el("span", "st pending", pendN + " تحت المراجعة"));
     const periods = opts.mine ? ["mid", "final"] : [opts.period];
-    periods.forEach(p => { const v = avg(codes.map(c => sm[p].get(c)).filter(Boolean)); if (v != null) meta.append(el("span", "st warn", PERIOD_NAME[p] + ": " + fmtAvg(v))); });
+    periods.forEach(p => { const got = codes.map(c => sm[p].get(c)).filter(Boolean);
+      if (got.length) meta.append(el("span", "st warn", PERIOD_NAME[p] + ": " + sumOf(got) + " من " + codes.length * 5)); });
     sum.append(h, meta); d.append(sum);
     const list = el("div", "items");
     items.forEach((text, ii) => {
@@ -1214,8 +1216,7 @@ async function loadMyPerf() {
   try { myPerf = await perf("mine"); } catch (e) { showMsg($("notice"), "تعذّر تحميل ملف الأداء.", false); return; }
   $("ptab-review").hidden = !myPerf.can_see_all;
   const sm = scoreMap(myPerf.scores);
-  $("pm-mid").textContent = fmtAvg(avg([...sm.mid.values()]));
-  $("pm-final").textContent = fmtAvg(avg([...sm.final.values()]));
+  ["mid", "final"].forEach(p => { const v = [...sm[p].values()]; $("pm-" + p).textContent = v.length ? fmtPct(sumOf(v), PERF_MAX) : "—"; });
   const by = st => myPerf.reports.filter(r => r.status === st).length;
   const covered = new Set(myPerf.reports.filter(r => r.status === "approved").map(r => r.item_code)).size;
   $("pm-count").textContent = myPerf.reports.length + " شاهد: " + by("approved") + " معتمد · " + by("pending") + " تحت المراجعة · " + by("rejected") + " مرفوض — "
@@ -1242,7 +1243,8 @@ function renderOverview() {
   list.forEach(t => {
     const tr = el("tr");
     [t.name, t.specialty || "—", t.reports, t.pending || "—", t.items + " / " + PERF_TOTAL,
-     t.mid_n ? fmtAvg(+t.mid) + " (" + t.mid_n + " بند)" : "—", t.final_n ? fmtAvg(+t.final) + " (" + t.final_n + " بند)" : "—"].forEach(v => tr.append(el("td", null, String(v))));
+     ...["mid", "final"].map(p => { const n = +t[p + "_n"]; if (!n) return "—"; const sum = Math.round(+t[p] * n);
+       return fmtPct(sum, PERF_MAX) + " (" + n + " من " + PERF_TOTAL + " بند)"; })].forEach(v => tr.append(el("td", null, String(v))));
     if (t.pending) tr.children[3].append(el("span", "st pending", " جديد"));
     const td = el("td"), b = el("button", "btn ghost sm", "فتح"); b.type = "button"; b.onclick = () => openTeacher(t.id); td.append(b); tr.append(td);
     body.append(tr);
@@ -1256,12 +1258,12 @@ async function openTeacher(id) {
   renderTeacherReview();
 }
 function renderTeacherReview() {
-  const sm = scoreMap(prData.scores), vals = [...sm[prPeriod].values()], a = avg(vals);
+  const sm = scoreMap(prData.scores), vals = [...sm[prPeriod].values()], total = sumOf(vals);
   $("pr-name").textContent = prData.teacher.name + (prData.teacher.specialty ? " · " + prData.teacher.specialty : "");
   const pend = prData.reports.filter(r => r.status === "pending").length;
   $("pr-count").textContent = prData.reports.length + " شاهد" + (pend ? " · " + pend + " بانتظار الاعتماد" : "") + " · "
     + new Set(prData.reports.filter(r => r.status === "approved").map(r => r.item_code)).size + " من " + PERF_TOTAL + " بند بشواهد معتمدة";
-  $("pr-avg").textContent = fmtAvg(a); $("pr-pct").textContent = pct(a); $("pr-done").textContent = vals.length;
+  $("pr-avg").textContent = vals.length ? total : "—"; $("pr-pct").textContent = vals.length ? fmtPct(total, PERF_MAX) : "—"; $("pr-done").textContent = vals.length;
   const n = prData.notes[prPeriod] || {};
   $("pr-pos").value = n.positives || ""; $("pr-rec").value = n.recommendations || "";
   $("pr-pos").readOnly = $("pr-rec").readOnly = !prData.can_score; $("pr-notes-row").hidden = !prData.can_score;
