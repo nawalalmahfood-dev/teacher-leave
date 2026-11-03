@@ -95,6 +95,16 @@ table{border-collapse:collapse;width:100%;min-width:600px;font-variant-numeric:t
 th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
 th{background:var(--sunk);font-weight:600;color:var(--muted);font-size:.8rem}
 tr:last-child td{border-bottom:0}
+/* compact controls inside tables (the teachers table has a lot per row) */
+.tablebox td input,.tablebox td select{font-size:.85rem;padding:4px 8px;border-radius:6px;width:auto}
+.tablebox td input.pin{font-size:.9rem;letter-spacing:.15em;width:76px}
+.tablebox td input[type="number"]{width:56px!important}
+.tablebox td .btn.sm{padding:4px 10px;font-size:.8rem}
+.tablebox td:first-child{min-width:170px}
+.tablebox td .inline-in{gap:4px;flex-wrap:nowrap}
+.staff-table{min-width:1150px}
+.staff-table td{padding:8px 10px;white-space:nowrap}
+.staff-table td:first-child{white-space:normal}
 .note-in{flex:1 1 180px}
 .alert{border-radius:8px;padding:12px 14px;font-weight:600;line-height:1.7}
 .alert.good{background:var(--ok-soft);color:var(--ok)}
@@ -323,7 +333,7 @@ footer{text-align:center}
       <p class="hint"><b>صلاحية الأداء:</b> «مقيّمة» ترى شواهد كل المعلمات وتقدّر البنود وتكتب الإيجابيات والتوصيات، واعتماد الشواهد أو رفضها للمديرة فقط. «اطلاع» ترى الشواهد والتقديرات فقط. المديرة لها كل صلاحيات الأداء تلقائيًا.</p>
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب ومرات الاستئذان المعتمدة قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وتظهر لها وللإدارة.</p>
-      <div class="tablebox"><table>
+      <div class="tablebox"><table class="staff-table">
         <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
