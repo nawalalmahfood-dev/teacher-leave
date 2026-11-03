@@ -102,7 +102,10 @@ tr:last-child td{border-bottom:0}
 .tablebox td .btn.sm{padding:4px 10px;font-size:.8rem}
 .tablebox td:first-child{min-width:170px}
 .tablebox td .inline-in{gap:4px;flex-wrap:nowrap}
-.staff-table{min-width:1150px}
+.staff-table{min-width:1350px}
+.prior-in{display:flex;gap:6px;align-items:flex-end}
+.prior-in label{font-size:.7rem;font-weight:600;gap:2px;color:var(--muted)}
+.prior-in input{width:52px!important}
 .staff-table td{padding:8px 10px;white-space:nowrap}
 .staff-table td:first-child{white-space:normal}
 .note-in{flex:1 1 180px}
@@ -276,9 +279,9 @@ footer{text-align:center}
     <section id="p-sum" class="list" style="gap:12px" hidden>
       <p class="hint">أرقام <span class="yr"></span>: الغياب المسجّل والاستئذان المعتمد. أيام الغياب تحتسب أيام الدوام من الأحد إلى الخميس.</p>
       <div class="stats" id="sum-stats"></div>
-      <p class="hint">«أخرى»: مرافقة مريض، ظرف أسري، إجازة وفاة، وغيرها. «رصيد سابق»: أيام أدخلتها الإدارة قبل تشغيل المنصة.</p>
+      <p class="hint">«أخرى»: مرافقة مريض، ظرف أسري، إجازة وفاة، وغيرها. كل نوع يشمل الرصيد السابق الذي أدخلته الإدارة لنفس النوع.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th>رصيد سابق</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
         <tbody id="sum-body"></tbody>
       </table></div>
       <form class="sheet" id="lim" novalidate data-mgr>
@@ -334,9 +337,9 @@ footer{text-align:center}
       </form>
       <p class="hint"><b>صلاحية الأداء:</b> «مقيّمة» ترى شواهد كل المعلمات وتقدّر البنود وتكتب الإيجابيات والتوصيات، واعتماد الشواهد أو رفضها للمديرة فقط. «اطلاع» ترى الشواهد والتقديرات فقط. المديرة لها كل صلاحيات الأداء تلقائيًا.</p>
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
-      <p class="hint">«رصيد سابق»: أيام الغياب ومرات الاستئذان المعتمدة قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وتظهر لها وللإدارة.</p>
+      <p class="hint">«رصيد سابق»: أيام الغياب حسب نوعها (اضطراري، مرضي، بدون عذر، أخرى) ومرات الاستئذان قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وإحصائية كل نوع.</p>
       <div class="tablebox"><table class="staff-table">
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -460,7 +463,8 @@ const needsApproval = r => r.type === "permission" || r.reason === EMERGENCY;
 function tally(reqs, t) {
   const prior = t && t.prior_year === yStartY;
   const s = { days: prior ? t.prior_days || 0 : 0, perms: prior ? t.prior_perms || 0 : 0, periods: 0, pend: 0, pendDays: 0, pendPerms: 0,
-    priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0, kind: { emerg: 0, sick: 0, unexc: 0, other: 0 } };
+    priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0,
+    kind: { emerg: prior ? t.prior_emerg || 0 : 0, sick: prior ? t.prior_sick || 0 : 0, unexc: prior ? t.prior_unexc || 0 : 0, other: prior ? t.prior_other || 0 : 0 } };
   reqs.filter(inYear).forEach(r => {
     const abs = r.type === "absence";
     if (r.status === "pending") { s.pend++; if (abs) s.pendDays += workDays(r.date_from, r.date_to); else s.pendPerms++; }
@@ -574,7 +578,7 @@ function renderTeacher() {
       : "تنبيه مهم: " + parts.join("، و") + " هذا العام، وهذا أعلى من الحد الذي حددته الإدارة. يُرجى مراجعة الإدارة.";
   const k = s.kind;
   $("m-note").textContent = "يُحتسب الغياب المسجّل والاستئذان المعتمد من 1 أغسطس " + yStartY + "."
-    + (s.days ? " أيام غيابك: اضطراري " + k.emerg + " · مرضي " + k.sick + " · بدون عذر " + k.unexc + " · أخرى " + k.other + (s.priorDays ? " · رصيد سابق " + s.priorDays : "") + " — الإجمالي " + s.days + "." : "")
+    + (s.days ? " أيام غيابك: اضطراري " + k.emerg + " · مرضي " + k.sick + " · بدون عذر " + k.unexc + " · أخرى " + k.other + " — الإجمالي " + s.days + (s.priorDays ? " (يشمل رصيدًا سابقًا " + s.priorDays + " يوم)" : "") + "." : "")
     + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pend ? " بانتظار الاعتماد: " + s.pend + " طلب." : "");
 
   const box = $("mine-list"); box.replaceChildren();
@@ -783,21 +787,21 @@ function renderAll() {
 }
 function renderSum() {
   const body = $("sum-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "أضيفي المعلمات من تبويب «المعلمات والرموز»."); td.colSpan = 12; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
-  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, prior: 0, days: 0, perms: 0, periods: 0, pend: 0 };
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "أضيفي المعلمات من تبويب «المعلمات والرموز»."); td.colSpan = 11; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, days: 0, perms: 0, periods: 0, pend: 0 };
   [...teachers.values()].map(t => ({ t, s: tallies.get(t.id) })).sort((a, b) => b.s.days - a.s.days || b.s.perms - a.s.perms).forEach(({ t, s }) => {
     const tr = el("tr"), k = s.kind;
-    [t.name, t.specialty || "—", k.emerg, k.sick, k.unexc, k.other, s.priorDays, s.days, s.perms, s.periods, s.pend].forEach(v => tr.append(el("td", null, String(v))));
-    tr.children[7].style.fontWeight = "700";
+    [t.name, t.specialty || "—", k.emerg, k.sick, k.unexc, k.other, s.days, s.perms, s.periods, s.pend].forEach(v => tr.append(el("td", null, String(v))));
+    tr.children[6].style.fontWeight = "700";
     const lv = level(s), td = el("td"); td.append(el("span", "st " + lv, LEVEL[lv])); tr.append(td);
     body.append(tr);
-    Object.keys(k).forEach(x => tot[x] += k[x]); tot.prior += s.priorDays; tot.days += s.days; tot.perms += s.perms; tot.periods += s.periods; tot.pend += s.pend;
+    Object.keys(k).forEach(x => tot[x] += k[x]); tot.days += s.days; tot.perms += s.perms; tot.periods += s.periods; tot.pend += s.pend;
   });
   const tr = el("tr");
-  ["الإجمالي", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.prior, tot.days, tot.perms, tot.periods, tot.pend, ""].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); });
+  ["الإجمالي", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.days, tot.perms, tot.periods, tot.pend, ""].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); });
   body.append(tr);
   const st = $("sum-stats"); st.replaceChildren();
-  [["a", tot.emerg, "أيام غياب اضطراري"], ["a", tot.sick, "أيام غياب مرضي"], ["a", tot.unexc, "أيام غياب بدون عذر"], ["a", tot.other + tot.prior, "أخرى ورصيد سابق"], ["", tot.days, "إجمالي أيام الغياب"]]
+  [["a", tot.emerg, "أيام غياب اضطراري"], ["a", tot.sick, "أيام غياب مرضي"], ["a", tot.unexc, "أيام غياب بدون عذر"], ["a", tot.other, "أيام غياب أخرى"], ["", tot.days, "إجمالي أيام الغياب"]]
     .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
 }
 function renderStaff() {
@@ -831,20 +835,23 @@ function renderStaff() {
       prs.disabled = false;
     };
     prTd.append(prs); tr.append(prTd);
-    const priorTd = el("td"), pw = el("div", "inline-in");
+    const priorTd = el("td"), pw = el("div", "prior-in");
     const cur = t.prior_year === yStartY;
-    const pd = el("input"); pd.type = "number"; pd.min = "0"; pd.max = "365"; pd.value = cur ? t.prior_days : 0; pd.title = "أيام غياب سابقة"; pd.style.width = "64px"; pd.id = "pd-" + t.id;
-    const pp = el("input"); pp.type = "number"; pp.min = "0"; pp.max = "500"; pp.value = cur ? t.prior_perms : 0; pp.title = "مرات استئذان سابقة"; pp.style.width = "64px"; pp.id = "pp-" + t.id;
+    const fields = [["emerg", "اضطراري"], ["sick", "مرضي"], ["unexc", "بدون عذر"], ["other", "أخرى"], ["perms", "استئذان"]].map(([k, label]) => {
+      const lab = el("label", null, label), inp = el("input"); inp.type = "number"; inp.min = "0"; inp.max = k === "perms" ? "500" : "365";
+      inp.value = cur ? t["prior_" + k] || 0 : 0; inp.id = "prior-" + k + "-" + t.id; lab.append(inp); pw.append(lab); return [k, inp];
+    });
     const ps = el("button", "btn ghost sm", "حفظ");
     ps.onclick = async () => {
-      const d = Math.max(0, Math.round(+pd.value || 0)), q = Math.max(0, Math.round(+pp.value || 0));
+      const v = { teacher_id: t.id, year: yStartY };
+      fields.forEach(([k, inp]) => v[k] = Math.max(0, Math.round(+inp.value || 0)));
       ps.disabled = true;
       let ok = true;
-      try { await staff("set_prior", { teacher_id: t.id, days: d, perms: q, year: yStartY }); } catch (e) { ok = false; }
+      try { await staff("set_prior", v); } catch (e) { ok = false; }
       ps.disabled = false; ps.textContent = ok ? "تم ✓" : "تعذّر";
       if (ok) setTimeout(loadAdmin, 600);
     };
-    pw.append(pd, el("span", "hint", "/"), pp, ps); priorTd.append(pw); tr.append(priorTd);
+    pw.append(ps); priorTd.append(pw); tr.append(priorTd);
     const pinTd = el("td"), wrap = el("div", "inline-in"), pin = el("input", "pin"); pin.inputMode = "numeric"; pin.maxLength = 4; pin.placeholder = "••••"; pin.id = "pin-" + t.id;
     pin.addEventListener("input", () => pin.value = pin.value.replace(/\D/g, "").slice(0, 4));
     pin.placeholder = "تلقائي";
