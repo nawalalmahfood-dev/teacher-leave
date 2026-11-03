@@ -211,7 +211,7 @@ footer{text-align:center}
         <label>من تاريخ<input type="date" id="f-from"></label>
         <label>إلى تاريخ<input type="date" id="f-to"></label>
         <label>سبب الغياب<select id="f-areason">
-          <option>إجازة مرضية</option><option>إجازة اضطرارية</option><option>مرافقة مريض</option>
+          <option>إجازة مرضية</option><option>إجازة اضطرارية</option><option>غياب بدون عذر</option><option>مرافقة مريض</option>
           <option>ظرف أسري</option><option>إجازة وفاة</option><option>أخرى</option></select></label>
       </div>
       <div class="grid" id="g-permission" hidden>
@@ -275,8 +275,10 @@ footer{text-align:center}
 
     <section id="p-sum" class="list" style="gap:12px" hidden>
       <p class="hint">أرقام <span class="yr"></span>: الغياب المسجّل والاستئذان المعتمد. أيام الغياب تحتسب أيام الدوام من الأحد إلى الخميس.</p>
+      <div class="stats" id="sum-stats"></div>
+      <p class="hint">«أخرى»: مرافقة مريض، ظرف أسري، إجازة وفاة، وغيرها. «رصيد سابق»: أيام أدخلتها الإدارة قبل تشغيل المنصة.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th>رصيد سابق</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th><th>بانتظار الاعتماد</th><th>المستوى</th></tr></thead>
         <tbody id="sum-body"></tbody>
       </table></div>
       <form class="sheet" id="lim" novalidate data-mgr>
@@ -451,15 +453,19 @@ const inYear = r => r.date_from >= yStart && r.date_from <= yEnd;
 let limits = { abs_warn: 5, abs_max: 10, perm_warn: 6, perm_max: 12 };
 const LEVEL = { good: "ضمن المعدل", warn: "تنبيه", high: "مرتفع" };
 // t: the teacher row; her prior balance (entered by the admin) counts only for the year it was entered for.
+// Absence categories for the statistics. Emergency absence needs a manager's approval (max two staff per day).
+const EMERGENCY = "إجازة اضطرارية";
+const absKind = r => r.reason === EMERGENCY ? "emerg" : r.reason === "إجازة مرضية" ? "sick" : r.reason === "غياب بدون عذر" ? "unexc" : "other";
+const needsApproval = r => r.type === "permission" || r.reason === EMERGENCY;
 function tally(reqs, t) {
   const prior = t && t.prior_year === yStartY;
   const s = { days: prior ? t.prior_days || 0 : 0, perms: prior ? t.prior_perms || 0 : 0, periods: 0, pend: 0, pendDays: 0, pendPerms: 0,
-    priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0 };
+    priorDays: prior ? t.prior_days || 0 : 0, priorPerms: prior ? t.prior_perms || 0 : 0, kind: { emerg: 0, sick: 0, unexc: 0, other: 0 } };
   reqs.filter(inYear).forEach(r => {
     const abs = r.type === "absence";
     if (r.status === "pending") { s.pend++; if (abs) s.pendDays += workDays(r.date_from, r.date_to); else s.pendPerms++; }
     if (r.status !== "approved") return;
-    if (abs) s.days += workDays(r.date_from, r.date_to);
+    if (abs) { const n = workDays(r.date_from, r.date_to); s.days += n; s.kind[absKind(r)] += n; }
     else { s.perms++; s.periods += (r.periods || []).length; }
   });
   return s;
@@ -566,8 +572,10 @@ function renderTeacher() {
     : lv === "warn"
       ? "انتبهي: " + parts.join("، و") + " هذا العام. حاولي تقليل الغياب والاستئذان قدر الإمكان."
       : "تنبيه مهم: " + parts.join("، و") + " هذا العام، وهذا أعلى من الحد الذي حددته الإدارة. يُرجى مراجعة الإدارة.";
+  const k = s.kind;
   $("m-note").textContent = "يُحتسب الغياب المسجّل والاستئذان المعتمد من 1 أغسطس " + yStartY + "."
-    + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pendPerms ? " استئذان بانتظار الاعتماد: " + s.pendPerms + "." : "");
+    + (s.days ? " أيام غيابك: اضطراري " + k.emerg + " · مرضي " + k.sick + " · بدون عذر " + k.unexc + " · أخرى " + k.other + (s.priorDays ? " · رصيد سابق " + s.priorDays : "") + " — الإجمالي " + s.days + "." : "")
+    + (s.priorDays || s.priorPerms ? " يشمل رصيدًا سابقًا أدخلته الإدارة: " + s.priorDays + " يوم غياب و" + s.priorPerms + " استئذان." : "") + (s.pend ? " بانتظار الاعتماد: " + s.pend + " طلب." : "");
 
   const box = $("mine-list"); box.replaceChildren();
   if (!reqs.length) { box.append(el("div", "empty", "لا توجد طلبات بعد. سجلي غيابك أو استئذانك من النموذج أعلاه.")); return; }
@@ -598,7 +606,7 @@ function renderPeriods() {
   }
 }
 $("f-pdate").addEventListener("input", () => { renderPeriods(); calc(); });
-["f-from", "f-to"].forEach(id => $(id).addEventListener("input", calc));
+["f-from", "f-to", "f-areason"].forEach(id => $(id).addEventListener("input", calc));
 function calc() {
   const c = $("calc");
   if (type === "absence") {
@@ -607,7 +615,8 @@ function calc() {
     if (a < todayISO) { c.textContent = "لا يمكن اختيار يوم مضى."; return; }
     if (b < a) { c.textContent = "تاريخ النهاية قبل تاريخ البداية."; return; }
     const n = workDays(a, b);
-    c.textContent = "مدة الغياب: " + n + (n === 1 ? " يوم دوام" : " أيام دوام") + " (بدون الجمعة والسبت)";
+    c.textContent = "مدة الغياب: " + n + (n === 1 ? " يوم دوام" : " أيام دوام") + " (بدون الجمعة والسبت)"
+      + ($("f-areason").value === EMERGENCY ? " — الإجازة الاضطرارية طلب مسبق يحتاج موافقة المديرة، والحد الأقصى موظفتان في اليوم نفسه." : "");
   } else {
     const d = $("f-pdate").value, n = d ? periodsInDay(d) : 0;
     if (!d) { c.textContent = "اختاري تاريخ الاستئذان."; return; }
@@ -642,11 +651,13 @@ $("f").addEventListener("submit", async ev => {
     if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات."
       : data.error === "no_school" ? "هذا اليوم إجازة نهاية الأسبوع."
       : data.error === "past_date" ? "لا يمكن التسجيل في يوم مضى. اختاري اليوم أو تاريخًا قادمًا."
+      : data.error === "emergency_full" ? "اكتمل عدد الإجازات الاضطرارية يوم " + fmtDate(data.date) + " (موظفتان). اختاري يومًا آخر أو راجعي الإدارة."
       : data.error === "bad_periods" ? "اختيار الحصص غير صحيح لهذا اليوم."
       : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
     chosen.clear(); renderPeriods();
     $("f-notes").value = "";
-    showMsg(msg, type === "absence" ? "تم تسجيل غيابك." : "تم إرسال طلب الاستئذان إلى الإدارة للاعتماد.", true);
+    showMsg(msg, type === "permission" ? "تم إرسال طلب الاستئذان إلى الإدارة للاعتماد."
+      : data.status === "pending" ? "تم إرسال طلب الإجازة الاضطرارية إلى المديرة للاعتماد." : "تم تسجيل غيابك.", true);
     tData = await fetchTeacher(); renderTeacher();
   } catch (e) { showMsg(msg, "تعذّر الإرسال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
   finally { $("f-submit").disabled = false; }
@@ -667,12 +678,12 @@ function card(r, opts) {
   mid.append(el("div", "when", whenText(r)));
   // Absences are recorded directly, with no approval step.
   const isAbs = r.type === "absence";
-  c.append(mid, el("span", "st " + r.status, isAbs && r.status === "approved" ? "مسجّل" : ST[r.status]));
+  c.append(mid, el("span", "st " + r.status, isAbs && !needsApproval(r) && r.status === "approved" ? "مسجّل" : ST[r.status]));
   c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")));
   if (opts.admin) {
     const act = el("div", "act");
-    if (isAbs || !isMgr()) {
-      // recorded absences have no approval step; only managers approve early leave
+    if (!needsApproval(r) || !isMgr()) {
+      // ordinary absences are recorded directly; only managers approve early leave and emergency absence
     } else if (r.status === "pending") {
       const note = el("input", "note-in"); note.placeholder = "ملاحظة للمعلمة (اختياري)"; note.id = "n-" + r.id; note.maxLength = 300;
       const ok = el("button", "btn ok sm", "اعتماد"), no = el("button", "btn no sm", "رفض");
@@ -772,13 +783,22 @@ function renderAll() {
 }
 function renderSum() {
   const body = $("sum-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "أضيفي المعلمات من تبويب «المعلمات والرموز»."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "أضيفي المعلمات من تبويب «المعلمات والرموز»."); td.colSpan = 12; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, prior: 0, days: 0, perms: 0, periods: 0, pend: 0 };
   [...teachers.values()].map(t => ({ t, s: tallies.get(t.id) })).sort((a, b) => b.s.days - a.s.days || b.s.perms - a.s.perms).forEach(({ t, s }) => {
-    const tr = el("tr");
-    [t.name, t.specialty || "—", s.days, s.perms, s.periods, s.pend].forEach(v => tr.append(el("td", null, String(v))));
+    const tr = el("tr"), k = s.kind;
+    [t.name, t.specialty || "—", k.emerg, k.sick, k.unexc, k.other, s.priorDays, s.days, s.perms, s.periods, s.pend].forEach(v => tr.append(el("td", null, String(v))));
+    tr.children[7].style.fontWeight = "700";
     const lv = level(s), td = el("td"); td.append(el("span", "st " + lv, LEVEL[lv])); tr.append(td);
     body.append(tr);
+    Object.keys(k).forEach(x => tot[x] += k[x]); tot.prior += s.priorDays; tot.days += s.days; tot.perms += s.perms; tot.periods += s.periods; tot.pend += s.pend;
   });
+  const tr = el("tr");
+  ["الإجمالي", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.prior, tot.days, tot.perms, tot.periods, tot.pend, ""].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); });
+  body.append(tr);
+  const st = $("sum-stats"); st.replaceChildren();
+  [["a", tot.emerg, "أيام غياب اضطراري"], ["a", tot.sick, "أيام غياب مرضي"], ["a", tot.unexc, "أيام غياب بدون عذر"], ["a", tot.other + tot.prior, "أخرى ورصيد سابق"], ["", tot.days, "إجمالي أيام الغياب"]]
+    .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
 }
 function renderStaff() {
   const body = $("staff-body"); body.replaceChildren();
@@ -1006,10 +1026,11 @@ $("lim").addEventListener("submit", async ev => {
 });
 
 $("a-csv").onclick = () => {
-  const rows = [["المعلمة", "التخصص", "النوع", "التاريخ", "إلى تاريخ", "الحصص", "المدة", "السبب", "ملاحظات", "الحالة", "ملاحظة الإدارة"]];
+  const rows = [["المعلمة", "التخصص", "النوع", "التصنيف", "التاريخ", "إلى تاريخ", "الحصص", "المدة", "السبب", "ملاحظات", "الحالة", "ملاحظة الإدارة"]];
   filteredAll().forEach(r => { const t = teachers.get(r.teacher_id) || {}, ps = r.periods || [];
-    rows.push([t.name, t.specialty, TYPE[r.type], r.date_from, r.date_to, ps.map(p => ORD[p]).join("، "),
-      r.type === "absence" ? workDays(r.date_from, r.date_to) + " يوم" : ps.length + " حصة", r.reason, r.notes, r.type === "absence" ? "مسجّل" : ST[r.status], r.admin_note]); });
+    const KIND = { emerg: "اضطراري", sick: "مرضي", unexc: "بدون عذر", other: "أخرى" };
+    rows.push([t.name, t.specialty, TYPE[r.type], r.type === "absence" ? KIND[absKind(r)] : "", r.date_from, r.date_to, ps.map(p => ORD[p]).join("، "),
+      r.type === "absence" ? workDays(r.date_from, r.date_to) + " يوم" : ps.length + " حصة", r.reason, r.notes, r.type === "absence" && !needsApproval(r) ? "مسجّل" : ST[r.status], r.admin_note]); });
   csvDownload(rows, "غياب-واستئذان-" + todayISO + ".csv");
 };
 
