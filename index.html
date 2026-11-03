@@ -1121,7 +1121,7 @@ function evidenceChip(r, canRemove, onRemoved) {
 function renderElements(box, opts) {
   const open = new Set([...box.querySelectorAll("details[open]")].map(d => d.dataset.el));
   box.replaceChildren();
-  const sm = scoreMap(opts.scores);
+  const sm = scoreMap(opts.scores), autoMap = new Map((opts.auto || []).map(x => [x.item_code, x]));
   const byItem = new Map(); opts.reports.forEach(r => { if (!byItem.has(r.item_code)) byItem.set(r.item_code, []); byItem.get(r.item_code).push(r); });
   PERF.forEach(([title, items], ei) => {
     const e = ei + 1, d = el("details", "el"); d.dataset.el = e; if (open.has(String(e))) d.open = true;
@@ -1137,9 +1137,14 @@ function renderElements(box, opts) {
     sum.append(h, meta); d.append(sum);
     const list = el("div", "items");
     items.forEach((text, ii) => {
-      const code = codes[ii], row = el("div", "item"), head = el("div", "item-head");
+      const code = codes[ii], row = el("div", "item"), head = el("div", "item-head"), auto = autoMap.get(code);
       const t = el("div", "item-text"); t.append(el("b", null, code)); t.append(document.createTextNode(text)); head.append(t);
-      if (opts.mine) {
+      if (auto) {
+        // 1.1 and 1.2 are calculated from the absence and early-leave records, never scored by hand
+        const sc = el("div", "scores");
+        for (let v = 1; v <= 5; v++) { const b = el("button", null, String(v)); b.type = "button"; b.disabled = true; b.setAttribute("aria-pressed", String(auto.score === v)); sc.append(b); }
+        if (opts.mine) head.append(el("div", "hint", "التقدير: " + auto.score)); else head.append(sc);
+      } else if (opts.mine) {
         const sc = el("div", "hint", ["mid", "final"].map(p => PERIOD_NAME[p] + ": " + (sm[p].get(code) || "—")).join(" · "));
         head.append(sc);
       } else {
@@ -1158,6 +1163,7 @@ function renderElements(box, opts) {
         head.append(sc);
       }
       row.append(head);
+      if (auto) row.append(el("div", "hint", "يُحسب تلقائيًا من سجل الغياب والاستئذان: " + auto.detail));
       const ev = el("div", "ev"), mineEv = byItem.get(code) || [];
       mineEv.forEach(r => ev.append(evidenceRow(r, opts)));
       if (!mineEv.length && !opts.mine) ev.append(el("span", "hint", "لا توجد شواهد"));
@@ -1222,7 +1228,7 @@ async function loadMyPerf() {
   $("pm-count").textContent = myPerf.reports.length + " شاهد: " + by("approved") + " معتمد · " + by("pending") + " تحت المراجعة · " + by("rejected") + " مرفوض — "
     + covered + " من " + PERF_TOTAL + " بند بشواهد معتمدة";
   ["mid", "final"].forEach(p => { const i = $("pm-note-" + p); if (document.activeElement !== i) i.value = (myPerf.notes[p] || {}).teacher_notes || ""; });
-  renderElements($("pm-elements"), { mine: true, reports: myPerf.reports, scores: myPerf.scores, onChange: loadMyPerf });
+  renderElements($("pm-elements"), { mine: true, reports: myPerf.reports, scores: myPerf.scores, auto: myPerf.auto, onChange: loadMyPerf });
 }
 $("pm-note-save").onclick = async () => {
   const m = $("pm-note-msg");
@@ -1243,8 +1249,8 @@ function renderOverview() {
   list.forEach(t => {
     const tr = el("tr");
     [t.name, t.specialty || "—", t.reports, t.pending || "—", t.items + " / " + PERF_TOTAL,
-     ...["mid", "final"].map(p => { const n = +t[p + "_n"]; if (!n) return "—"; const sum = Math.round(+t[p] * n);
-       return fmtPct(sum, PERF_MAX) + " (" + n + " من " + PERF_TOTAL + " بند)"; })].forEach(v => tr.append(el("td", null, String(v))));
+     ...["mid", "final"].map(p => { const n = +t[p + "_n"]; if (!n) return "—";
+       return fmtPct(+t[p + "_sum"], PERF_MAX) + " (" + n + " من " + PERF_TOTAL + " بند)"; })].forEach(v => tr.append(el("td", null, String(v))));
     if (t.pending) tr.children[3].append(el("span", "st pending", " جديد"));
     const td = el("td"), b = el("button", "btn ghost sm", "فتح"); b.type = "button"; b.onclick = () => openTeacher(t.id); td.append(b); tr.append(td);
     body.append(tr);
@@ -1268,7 +1274,7 @@ function renderTeacherReview() {
   $("pr-pos").value = n.positives || ""; $("pr-rec").value = n.recommendations || "";
   $("pr-pos").readOnly = $("pr-rec").readOnly = !prData.can_score; $("pr-notes-row").hidden = !prData.can_score;
   $("pr-tnote").textContent = n.teacher_notes ? "إضافات من المعلمة: " + n.teacher_notes : "";
-  renderElements($("pr-elements"), { mine: false, canScore: prData.can_score, period: prPeriod, reports: prData.reports, scores: prData.scores,
+  renderElements($("pr-elements"), { mine: false, canScore: prData.can_score, period: prPeriod, reports: prData.reports, scores: prData.scores, auto: prData.auto,
     teacherId: prTeacherId, onChange: () => openTeacher(prTeacherId) });
 }
 document.querySelectorAll("#pr-period button").forEach(b => b.onclick = () => {
