@@ -117,6 +117,31 @@ tr:last-child td{border-bottom:0}
 .periods{display:flex;flex-wrap:wrap;gap:8px}
 .periods button{font:600 .9rem var(--body);min-width:84px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
 .periods button[aria-pressed="true"]{background:var(--leave-soft);border-color:var(--leave);color:var(--leave)}
+.modes{display:flex;gap:6px;background:var(--sunk);border-radius:10px;padding:4px;width:fit-content;max-width:100%;flex-wrap:wrap}
+.modes button{border:0;background:transparent;padding:9px 16px;border-radius:7px;font:600 .95rem var(--body);color:var(--muted);cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+details.el{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+details.el > summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+details.el > summary::-webkit-details-marker{display:none}
+details.el > summary h3{font-family:var(--display);font-weight:600;font-size:1rem;margin:0}
+details.el[open] > summary{border-bottom:1px solid var(--line)}
+.el-meta{display:flex;gap:6px;flex-wrap:wrap}
+.items{display:flex;flex-direction:column}
+.item{padding:12px 16px;border-bottom:1px dashed var(--line);display:flex;flex-direction:column;gap:8px}
+.item:last-child{border-bottom:0}
+.item-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.item-text{min-width:0;flex:1 1 260px;overflow-wrap:anywhere}
+.item-text b{color:var(--muted);font-variant-numeric:tabular-nums;margin-inline-end:6px}
+.ev{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);border:0;cursor:pointer;text-decoration:none;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.chip .x{background:none;border:0;color:var(--absent);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px}
+.scores{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.scores button{width:34px;height:34px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);font:700 .95rem var(--body);cursor:pointer}
+.scores button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.scores button:disabled{cursor:default;opacity:1}
+.add-ev{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;background:var(--sunk);border-radius:8px;padding:12px}
+.grade{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums}
 a.wa{display:inline-block;font:600 .85rem var(--body);padding:5px 12px;border-radius:7px;background:var(--ok);color:var(--surface);text-decoration:none;white-space:nowrap}
 footer{text-align:center}
 @media (max-width:520px){.rec{grid-template-columns:1fr}.rec .why{grid-column:1}h1{font-size:1.35rem}}
@@ -134,6 +159,11 @@ footer{text-align:center}
   </header>
 
   <div id="notice" class="msg bad" hidden></div>
+
+  <nav class="modes" id="modes" hidden aria-label="القسم">
+    <button type="button" data-mode="leave" aria-pressed="true">الغياب والاستئذان</button>
+    <button type="button" data-mode="perf" aria-pressed="false">الأداء الوظيفي</button>
+  </nav>
 
   <!-- ========== Teacher sign-in ========== -->
   <form class="sheet narrow" id="t-login" novalidate>
@@ -287,16 +317,82 @@ footer{text-align:center}
         <div class="row"><button class="btn sm" type="submit">إضافة</button><button class="btn ghost sm" type="button" id="n-rand">رمز عشوائي</button><span class="msg" id="n-msg" hidden></span></div>
         <p class="hint">اتركي الرمز فارغًا ليُنشأ تلقائيًا. الرمز لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
       </form>
+      <p class="hint"><b>صلاحية الأداء:</b> «مقيّمة» ترى شواهد كل المعلمات وتقدّر البنود وتكتب الإيجابيات والتوصيات. «اطلاع» ترى الشواهد والتقديرات فقط. المديرة لها كل صلاحيات الأداء تلقائيًا.</p>
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب ومرات الاستئذان المعتمدة قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وتظهر لها وللإدارة.</p>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (غياب / استئذان)</th><th>رمز جديد</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
 
   </section>
 
+
+  <!-- ========== Job performance ========== -->
+  <section id="perf" class="list" style="gap:16px" hidden>
+    <nav class="tabs" id="perf-tabs" role="tablist">
+      <button role="tab" data-ptab="mine" aria-selected="true">شواهدي</button>
+      <button role="tab" data-ptab="review" aria-selected="false" hidden id="ptab-review">تقييم المعلمات</button>
+    </nav>
+
+    <section id="pp-mine" class="list" style="gap:14px">
+      <div class="sheet">
+        <div class="row" style="justify-content:space-between"><h2>ملف الأداء الوظيفي — <span class="yr"></span></h2><span class="hint" id="pm-count"></span></div>
+        <p class="hint">أضيفي شواهدك تحت كل بند: ملفًا (PDF أو صورة أو Word، حتى 10 ميجا) أو رابطًا. التقدير من 1 إلى 5 تضعه المقيّمة في المراجعة النصف سنوية والنهائية، ويظهر لك هنا.</p>
+        <div class="stats">
+          <div class="stat"><b id="pm-mid">—</b><span>تقدير المراجعة النصف سنوية</span></div>
+          <div class="stat"><b id="pm-final">—</b><span>تقدير المراجعة النهائية</span></div>
+        </div>
+      </div>
+      <div id="pm-elements" class="list"></div>
+      <div class="sheet">
+        <h2>إضافات من المعلمة</h2>
+        <div class="grid">
+          <label>المراجعة النصف سنوية<textarea id="pm-note-mid" maxlength="2000"></textarea></label>
+          <label>المراجعة النهائية<textarea id="pm-note-final" maxlength="2000"></textarea></label>
+        </div>
+        <div class="row"><button class="btn sm" type="button" id="pm-note-save">حفظ</button><span class="msg" id="pm-note-msg" hidden></span></div>
+      </div>
+    </section>
+
+    <section id="pp-review" class="list" style="gap:14px" hidden>
+      <div id="pr-list" class="list" style="gap:12px">
+        <div class="row" style="justify-content:space-between"><label style="flex-direction:row;align-items:center;gap:8px">بحث<input id="pr-q" placeholder="اسم المعلمة" style="width:auto"></label><button class="btn ghost sm" type="button" id="pr-refresh">تحديث</button></div>
+        <div class="tablebox"><table>
+          <thead><tr><th>المعلمة</th><th>التخصص</th><th>الشواهد</th><th>البنود المغطّاة</th><th>النصف سنوية</th><th>النهائية</th><th></th></tr></thead>
+          <tbody id="pr-body"></tbody>
+        </table></div>
+      </div>
+      <div id="pr-detail" class="list" style="gap:14px" hidden>
+        <div class="row" style="justify-content:space-between">
+          <button class="btn ghost sm" type="button" id="pr-back">→ كل المعلمات</button>
+          <div class="modes" id="pr-period">
+            <button type="button" data-period="mid" aria-pressed="true">المراجعة النصف سنوية</button>
+            <button type="button" data-period="final" aria-pressed="false">المراجعة النهائية</button>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="row" style="justify-content:space-between"><h2 id="pr-name"></h2><span class="hint" id="pr-count"></span></div>
+          <div class="stats">
+            <div class="stat"><b class="grade" id="pr-avg">—</b><span>متوسط البنود المقدّرة (من 5)</span></div>
+            <div class="stat"><b class="grade" id="pr-pct">—</b><span>التقدير العام</span></div>
+            <div class="stat"><b class="grade" id="pr-done">0</b><span>بنود مقدّرة من 56</span></div>
+          </div>
+        </div>
+        <div id="pr-elements" class="list"></div>
+        <form class="sheet" id="pr-notes" novalidate>
+          <h2>ملاحظات المراجعة</h2>
+          <div class="grid">
+            <label>الإيجابيات<textarea id="pr-pos" maxlength="2000"></textarea></label>
+            <label>التوصيات<textarea id="pr-rec" maxlength="2000"></textarea></label>
+          </div>
+          <p class="hint" id="pr-tnote"></p>
+          <div class="row" id="pr-notes-row"><button class="btn sm" type="submit">حفظ الملاحظات</button><span class="msg" id="pr-notes-msg" hidden></span></div>
+        </form>
+      </div>
+    </section>
+  </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -382,10 +478,15 @@ const isStaff = () => myRole !== "teacher";
 const canCancel = () => myRole === "editor" || myRole === "manager";
 const isMgr = () => myRole === "manager";
 // view: "login" | "teacher" | "staff" (staff also reach their own requests through the «طلباتي» tab)
+let curView = "login", appMode = "leave";
 function show(view) {
+  curView = view;
+  const perfOn = view !== "login" && appMode === "perf";
   $("t-login").hidden = view !== "login";
-  $("teacher").hidden = view !== "teacher";
-  $("admin").hidden = view !== "staff";
+  $("modes").hidden = view === "login";
+  $("teacher").hidden = perfOn || view !== "teacher";
+  $("admin").hidden = perfOn || view !== "staff";
+  $("perf").hidden = !perfOn;
   $("logout").hidden = view === "login";
   $("role").hidden = view === "login";
   $("role").textContent = session ? session.name + (isStaff() ? " · " + ROLE_NAME[myRole] : "") : "";
@@ -393,6 +494,7 @@ function show(view) {
 }
 $("logout").onclick = () => {
   stopPoll(); session = null; myRole = "teacher"; store.del("leave.session"); $("t-pin").value = "";
+  appMode = "leave"; document.querySelectorAll("#modes button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.mode === "leave")));
   boot();
 };
 
@@ -465,9 +567,9 @@ let type = "absence";
 // Teachers can only record today or later.
 ["f-from", "f-to", "f-pdate"].forEach(id => $(id).min = todayISO);
 $("f-from").addEventListener("input", () => { $("f-to").min = $("f-from").value || todayISO; if ($("f-to").value < $("f-to").min) $("f-to").value = $("f-to").min; });
-document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+document.querySelectorAll("#f .seg button").forEach(b => b.addEventListener("click", () => {
   type = b.dataset.t;
-  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  document.querySelectorAll("#f .seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
   $("g-absence").hidden = type !== "absence"; $("g-permission").hidden = type !== "permission"; calc();
 }));
 let chosen = new Set();
@@ -624,6 +726,7 @@ async function loadAdmin() {
   teachers = new Map(d.teachers.map(x => [x.id, x]));
   reqs = d.requests.filter(x => teachers.has(x.teacher_id));
   if (d.limits) limits = d.limits;
+  if (isMgr()) { try { (await perf("overview")).teachers.forEach(x => perfRoles.set(x.id, x.perf_role)); } catch (e) {} }
   Object.keys(limits).forEach(k => { const i = $("l-" + k); if (i && document.activeElement !== i) i.value = limits[k]; });
   const by = new Map(); reqs.forEach(x => { if (!by.has(x.teacher_id)) by.set(x.teacher_id, []); by.get(x.teacher_id).push(x); });
   tallies = new Map([...teachers.keys()].map(id => [id, tally(by.get(id) || [], teachers.get(id))]));
@@ -666,7 +769,7 @@ function renderSum() {
 }
 function renderStaff() {
   const body = $("staff-body"); body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 8; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const me = t.id === session.id;
     const tr = el("tr");
@@ -684,6 +787,17 @@ function renderStaff() {
       rs.disabled = false;
     };
     roleTd.append(rs); tr.append(roleTd);
+    const prTd = el("td"), prs = el("select"); prs.id = "prole-" + t.id; prs.style.width = "auto";
+    Object.entries(PERF_ROLE_NAME).forEach(([k, v]) => { const o = el("option", null, v); o.value = k; prs.append(o); });
+    prs.value = perfRoles.get(t.id) || "none";
+    if (t.role === "manager") { prs.disabled = true; prs.title = "المديرة لها كل صلاحيات الأداء"; }
+    prs.onchange = async () => {
+      prs.disabled = true;
+      try { await perf("set_perf_role", { teacher_id: t.id, perf_role: prs.value }); perfRoles.set(t.id, prs.value); }
+      catch (e) { prs.value = perfRoles.get(t.id) || "none"; }
+      prs.disabled = false;
+    };
+    prTd.append(prs); tr.append(prTd);
     const priorTd = el("td"), pw = el("div", "inline-in");
     const cur = t.prior_year === yStartY;
     const pd = el("input"); pd.type = "number"; pd.min = "0"; pd.max = "365"; pd.value = cur ? t.prior_days : 0; pd.title = "أيام غياب سابقة"; pd.style.width = "64px"; pd.id = "pd-" + t.id;
@@ -886,8 +1000,8 @@ $("a-csv").onclick = () => {
   csvDownload(rows, "غياب-واستئذان-" + todayISO + ".csv");
 };
 
-document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+document.querySelectorAll("#admin .tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
   ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
   // «طلباتي» shows the staff member's own balance, form and requests.
   $("teacher").hidden = b.dataset.tab !== "mine";
@@ -896,6 +1010,259 @@ document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click
 ["a-q", "a-type", "a-st", "a-from", "a-to"].forEach(id => $(id).addEventListener("input", renderAll));
 $("d-date").addEventListener("input", renderDay);
 $("refresh").onclick = loadAdmin;
+
+// ================= JOB PERFORMANCE =================
+// The school's evaluation form: 11 elements, each with numbered follow-up items (codes "element.item").
+const PERF = [
+  ["أداء الواجبات الوظيفية", ["الحفاظ على الدوام", "إشعار الإدارة بالغياب ونوعه بوقت كافٍ", "شغل حصص الانتظار وتفعيلها", "المشاركة في اللجان المدرسية وتفعيلها",
+    "الالتزام بالمناوبة اليومية وفق الجدول المعد", "الالتزام بمواعيد رصد الدرجات والدقة في الرصد", "تقديم مبادرة للمدرسة وتنفيذها على المنسوبات",
+    "إعداد خطة أنشطة لاصفية تساهم في رفع التحصيل الدراسي والدافعية لدى الطالبات", "تفعيل الإذاعة الصباحية", "الالتزام بحضور الطابور الصباحي والمساهمة في تنظيمه",
+    "الالتزام بزمن الحصة الدراسية", "الاطلاع والالتزام بالتعاميم واللوائح المنظمة والتوقيع عليها بالعلم", "الالتزام بالسلوك المهني", "اتباع الأساليب التربوية مع الطالبات", "تفعيل منصة مدرستي"]],
+  ["التفاعل مع المجتمع المهني", ["تنفيذ البرامج التدريبية", "حضور البرامج التدريبية الداخلية والخارجية", "تنفيذ وحضور زيارات تبادلية", "تنفيذ الدروس التطبيقية والحلقات التنشيطية",
+    "تقديم إنتاج معرفي / تجارب عملية / وسيلة تعليمية / حقيبة تعليمية", "رتبة الرخصة المهنية"]],
+  ["التفاعل مع أولياء الأمور", ["حضور اجتماعات أولياء الأمور", "إرسال استمارات الاستدعاء عند الحاجة", "مشاركة أولياء الأمور في العملية التعليمية", "تفعيل سجل المتابعة في منصة مدرستي"]],
+  ["التنوع في استراتيجيات التدريس", ["اختبار أنماط التعلم ووضع خطة شاملة للاستراتيجيات تتناسب مع الأنماط وتحقق الأهداف", "تنفيذ استراتيجيات متنوعة تتناسب مع الأنماط المختلفة وتحقق الأهداف",
+    "تفعيل الاستراتيجيات التي تنمي مهارات الفهم القرائي والعددي لدى الطالبات وتدعم قدرتهن على الحوار والمناقشة"]],
+  ["تحسين نتائج المتعلمين", ["تنفيذ أنشطة لاصفية تساهم في رفع التحصيل الدراسي والدافعية لدى الطالبات", "وضع خطة علاجية وإثرائية للمهارات الأساسية", "متابعة ملفات إنجاز المتعلمين",
+    "التحفيز والتكريم وتعزيز ثقة الطالبات بأنفسهن", "وضوح الفروق الفردية في درجات طالبات الفترة الأولى", "ارتفاع مستوى التحصيل الدراسي للطالبات في الفترة الثانية",
+    "استخدام ممارسة مبتكرة تساهم في تحسين نتائج المتعلمين", "تحسين نتائج الطالبات في اختبارات التحصيلي والقدرات"]],
+  ["إعداد وتنفيذ خطة التعلم", ["تسليم توزيع المنهج في الوقت المحدد", "تحضير الدروس في المنصة في الوقت المحدد", "تقديم خطة التعلم الشاملة للمقرر", "تنفيذ الخطة العلاجية والإثرائية للمهارات الأساسية"]],
+  ["توظيف تقنيات ووسائل التعلم المناسبة", ["استخدام برنامج تقني بصورة مبتكرة", "استخدام وسائل وتقنيات مناسبة لحاجات وأنماط المتعلمين وتراعي الفروق الفردية",
+    "تنمية قدرة الطالبة على البحث العلمي", "تفعيل تطبيقات وبرامج الذكاء الاصطناعي في الحصة الدراسية", "تفعيل الأنشطة والواجبات والاختبارات والإثرائيات في منصة مدرستي"]],
+  ["تهيئة بيئة تعليمية", ["توفير بيئة تعليمية آمنة خالية من الأخطار", "توفير بيئة تعليمية تحقق الأمان النفسي والاحترام المتبادل"]],
+  ["الإدارة الصفية", ["عرض القوانين الصفية للطالبات في الحصة الدراسية", "توجيه الطالبات لتطبيق القوانين الصفية في الحصة الدراسية", "تعزيز الانضباط"]],
+  ["تحليل نتائج المتعلمين وتشخيص مستوياتهم", ["تحليل نتائج التقييم وإعداد التقارير بشأن فعالية التدريس", "إشراك الطالبات في نتائجهن ومدى تقدمهن لدعم تطورهن"]],
+  ["تنوع أساليب التقويم", ["تنوع أساليب التقويم (اختبارات شفهية / تحريرية / مهام أدائية)", "تقديم التغذية الراجعة لتقويم الطالبات",
+    "تطبيق التقويم التكويني والبنائي لتطوير أداء الطالبات", "بناء الاختبارات (الفصلية والنهائية) وفق معايير الاختبار الجيد"]],
+];
+const PERF_TOTAL = PERF.reduce((n, e) => n + e[1].length, 0);
+const PERF_ROLE_NAME = { none: "بدون", viewer: "اطلاع", reviewer: "مقيّمة" };
+const PERIOD_NAME = { mid: "النصف سنوية", final: "النهائية" };
+const MAX_FILE = 10 * 1024 * 1024;
+let perfRoles = new Map(), myPerf = null, prData = null, prPeriod = "mid", prOverview = [];
+
+async function perf(action, args) {
+  const { data, error } = await sb.rpc("leave_perf", { p_actor: session.id, p_pin: session.pin, p_action: action, p_args: args || {} });
+  if (error) throw error;
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+async function filesFn(body) {
+  const res = await fetch(SB_URL + "/functions/v1/leave-files", { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY },
+    body: JSON.stringify({ actor: session.id, pin: session.pin, ...body }) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.error) throw new Error(d.error || "server");
+  return d;
+}
+// Open a file in a new tab; the tab is opened before the await so pop-up blockers allow it.
+async function openEvidence(r) {
+  if (r.kind === "link") return;
+  const w = window.open("", "_blank");
+  try { const { url } = await filesFn({ action: "open", report_id: r.id }); if (w) w.location = url; else location.href = url; }
+  catch (e) { if (w) w.close(); showMsg($("notice"), "تعذّر فتح الملف. حاولي مرة أخرى.", false); }
+}
+const avg = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+const fmtAvg = v => v == null ? "—" : (Math.round(v * 100) / 100).toString();
+const pct = v => v == null ? "—" : Math.round(v / 5 * 100) + "٪";
+function scoreMap(scores) { const m = { mid: new Map(), final: new Map() }; (scores || []).forEach(x => m[x.period].set(x.item_code, x.score)); return m; }
+
+function evidenceChip(r, canRemove, onRemoved) {
+  const chip = r.kind === "link" ? el("a", "chip") : el("button", "chip");
+  if (r.kind === "link") { chip.href = r.url; chip.target = "_blank"; chip.rel = "noopener"; } else { chip.type = "button"; chip.onclick = () => openEvidence(r); }
+  chip.append(el("span", null, (r.kind === "link" ? "🔗 " : "📎 ") + r.title));
+  if (canRemove) {
+    const x = el("button", "x", "×"); x.type = "button"; x.title = "حذف الشاهد"; let armed = false;
+    x.onclick = async ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!armed) { armed = true; x.textContent = "حذف؟"; setTimeout(() => { armed = false; x.textContent = "×"; }, 4000); return; }
+      try { await perf("remove", { report_id: r.id }); onRemoved(); } catch (e) { x.textContent = "تعذّر"; }
+    };
+    chip.append(x);
+  }
+  return chip;
+}
+
+// Renders the 11 elements. opts: { mine, canScore, period, reports, scores, onChange, teacherId }
+function renderElements(box, opts) {
+  const open = new Set([...box.querySelectorAll("details[open]")].map(d => d.dataset.el));
+  box.replaceChildren();
+  const sm = scoreMap(opts.scores);
+  const byItem = new Map(); opts.reports.forEach(r => { if (!byItem.has(r.item_code)) byItem.set(r.item_code, []); byItem.get(r.item_code).push(r); });
+  PERF.forEach(([title, items], ei) => {
+    const e = ei + 1, d = el("details", "el"); d.dataset.el = e; if (open.has(String(e))) d.open = true;
+    const codes = items.map((_, ii) => e + "." + (ii + 1));
+    const evN = codes.reduce((n, c) => n + (byItem.get(c) || []).length, 0);
+    const sum = el("summary"), h = el("h3", null, e + ". " + title), meta = el("div", "el-meta");
+    meta.append(el("span", "st " + (evN ? "approved" : "pending"), evN + " شاهد"));
+    const periods = opts.mine ? ["mid", "final"] : [opts.period];
+    periods.forEach(p => { const v = avg(codes.map(c => sm[p].get(c)).filter(Boolean)); if (v != null) meta.append(el("span", "st warn", PERIOD_NAME[p] + ": " + fmtAvg(v))); });
+    sum.append(h, meta); d.append(sum);
+    const list = el("div", "items");
+    items.forEach((text, ii) => {
+      const code = codes[ii], row = el("div", "item"), head = el("div", "item-head");
+      const t = el("div", "item-text"); t.append(el("b", null, code)); t.append(document.createTextNode(text)); head.append(t);
+      if (opts.mine) {
+        const sc = el("div", "hint", ["mid", "final"].map(p => PERIOD_NAME[p] + ": " + (sm[p].get(code) || "—")).join(" · "));
+        head.append(sc);
+      } else {
+        const sc = el("div", "scores"), cur = sm[opts.period].get(code);
+        for (let v = 1; v <= 5; v++) {
+          const b = el("button", null, String(v)); b.type = "button"; b.setAttribute("aria-pressed", String(cur === v)); b.disabled = !opts.canScore;
+          b.title = opts.canScore ? (cur === v ? "اضغطي لإلغاء التقدير" : "تقدير " + v) : "";
+          b.onclick = async () => {
+            const next = cur === v ? "" : v;
+            sc.querySelectorAll("button").forEach(x => x.disabled = true);
+            try { await perf("score", { teacher_id: opts.teacherId, item_code: code, period: opts.period, score: next }); opts.onChange(); }
+            catch (err) { sc.querySelectorAll("button").forEach(x => x.disabled = false); }
+          };
+          sc.append(b);
+        }
+        head.append(sc);
+      }
+      row.append(head);
+      const ev = el("div", "ev"), mineEv = byItem.get(code) || [];
+      mineEv.forEach(r => ev.append(evidenceChip(r, opts.mine, opts.onChange)));
+      if (!mineEv.length && !opts.mine) ev.append(el("span", "hint", "لا توجد شواهد"));
+      if (opts.mine) {
+        const add = el("button", "link", "+ إضافة شاهد"); add.type = "button";
+        add.onclick = () => { add.hidden = true; row.append(addEvidenceForm(code, () => { add.hidden = false; }, opts.onChange)); };
+        ev.append(add);
+      }
+      row.append(ev); list.append(row);
+    });
+    d.append(list); box.append(d);
+  });
+}
+
+function addEvidenceForm(code, onClose, onDone) {
+  const f = el("div", "add-ev"), uid = code.replace(".", "-");
+  const kind = el("select"); kind.id = "ev-kind-" + uid; [["file", "ملف"], ["link", "رابط"]].forEach(([v, l]) => { const o = el("option", null, l); o.value = v; kind.append(o); });
+  const title = el("input"); title.id = "ev-title-" + uid; title.placeholder = "عنوان الشاهد (مثال: شهادة حضور دورة)"; title.maxLength = 200;
+  const file = el("input"); file.type = "file"; file.id = "ev-file-" + uid; file.accept = ".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.ppt,.pptx,.xls,.xlsx";
+  const url = el("input"); url.type = "url"; url.id = "ev-url-" + uid; url.placeholder = "https://"; url.dir = "ltr"; url.hidden = true;
+  const save = el("button", "btn sm", "حفظ"), cancel = el("button", "btn ghost sm", "إلغاء"), msg = el("span", "msg"); msg.hidden = true;
+  save.type = "button"; cancel.type = "button";
+  kind.onchange = () => { file.hidden = kind.value !== "file"; url.hidden = kind.value !== "link"; };
+  file.onchange = () => { if (!title.value && file.files[0]) title.value = file.files[0].name.replace(/\.[^.]+$/, ""); };
+  cancel.onclick = () => { f.remove(); onClose(); };
+  save.onclick = async () => {
+    const t = title.value.trim();
+    if (!t) return showMsg(msg, "اكتبي عنوان الشاهد.", false);
+    save.disabled = true;
+    try {
+      if (kind.value === "link") {
+        if (!/^https?:\/\//i.test(url.value.trim())) { save.disabled = false; return showMsg(msg, "الرابط يبدأ بـ https://", false); }
+        await perf("add_link", { item_code: code, title: t, url: url.value.trim() });
+      } else {
+        const fl = file.files[0];
+        if (!fl) { save.disabled = false; return showMsg(msg, "اختاري الملف.", false); }
+        if (fl.size > MAX_FILE) { save.disabled = false; return showMsg(msg, "حجم الملف أكبر من 10 ميجا.", false); }
+        showMsg(msg, "جارٍ الرفع…", true);
+        const { path, token } = await filesFn({ action: "upload", file_name: fl.name, size: fl.size });
+        const up = await sb.storage.from("leave-reports").uploadToSignedUrl(path, token, fl, { contentType: fl.type || "application/octet-stream" });
+        if (up.error) throw up.error;
+        await perf("add_file", { item_code: code, title: t, path, file_name: fl.name, size_bytes: fl.size });
+      }
+      f.remove(); onClose(); onDone();
+    } catch (e) {
+      save.disabled = false;
+      showMsg(msg, /mime|type/i.test(e.message || "") ? "نوع الملف غير مسموح. استخدمي PDF أو صورة أو Word." : "تعذّر الحفظ. حاولي مرة أخرى.", false);
+    }
+  };
+  const btns = el("div", "row"); btns.append(save, cancel, msg);
+  f.append(kind, title, file, url, btns);
+  return f;
+}
+
+async function loadMyPerf() {
+  try { myPerf = await perf("mine"); } catch (e) { showMsg($("notice"), "تعذّر تحميل ملف الأداء.", false); return; }
+  $("ptab-review").hidden = !myPerf.can_see_all;
+  const sm = scoreMap(myPerf.scores);
+  $("pm-mid").textContent = fmtAvg(avg([...sm.mid.values()]));
+  $("pm-final").textContent = fmtAvg(avg([...sm.final.values()]));
+  const covered = new Set(myPerf.reports.map(r => r.item_code)).size;
+  $("pm-count").textContent = myPerf.reports.length + " شاهد · " + covered + " من " + PERF_TOTAL + " بند";
+  ["mid", "final"].forEach(p => { const i = $("pm-note-" + p); if (document.activeElement !== i) i.value = (myPerf.notes[p] || {}).teacher_notes || ""; });
+  renderElements($("pm-elements"), { mine: true, reports: myPerf.reports, scores: myPerf.scores, onChange: loadMyPerf });
+}
+$("pm-note-save").onclick = async () => {
+  const m = $("pm-note-msg");
+  try {
+    for (const p of ["mid", "final"]) await perf("teacher_note", { period: p, text: $("pm-note-" + p).value.trim() });
+    showMsg(m, "تم الحفظ.", true);
+  } catch (e) { showMsg(m, "تعذّر الحفظ.", false); }
+};
+
+async function loadOverview() {
+  try { prOverview = (await perf("overview")).teachers; } catch (e) { showMsg($("notice"), "تعذّر تحميل قائمة المعلمات.", false); return; }
+  renderOverview();
+}
+function renderOverview() {
+  const q = $("pr-q").value.trim(), body = $("pr-body"); body.replaceChildren();
+  const list = prOverview.filter(t => !q || t.name.includes(q));
+  if (!list.length) { const tr = el("tr"), td = el("td", null, "لا توجد نتائج."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  list.forEach(t => {
+    const tr = el("tr");
+    [t.name, t.specialty || "—", t.reports, t.items + " / " + PERF_TOTAL,
+     t.mid_n ? fmtAvg(+t.mid) + " (" + t.mid_n + " بند)" : "—", t.final_n ? fmtAvg(+t.final) + " (" + t.final_n + " بند)" : "—"].forEach(v => tr.append(el("td", null, String(v))));
+    const td = el("td"), b = el("button", "btn ghost sm", "فتح"); b.type = "button"; b.onclick = () => openTeacher(t.id); td.append(b); tr.append(td);
+    body.append(tr);
+  });
+}
+let prTeacherId = null;
+async function openTeacher(id) {
+  prTeacherId = id;
+  try { prData = await perf("teacher", { teacher_id: id }); } catch (e) { showMsg($("notice"), "تعذّر تحميل ملف المعلمة.", false); return; }
+  $("pr-list").hidden = true; $("pr-detail").hidden = false;
+  renderTeacherReview();
+}
+function renderTeacherReview() {
+  const sm = scoreMap(prData.scores), vals = [...sm[prPeriod].values()], a = avg(vals);
+  $("pr-name").textContent = prData.teacher.name + (prData.teacher.specialty ? " · " + prData.teacher.specialty : "");
+  $("pr-count").textContent = prData.reports.length + " شاهد · " + new Set(prData.reports.map(r => r.item_code)).size + " من " + PERF_TOTAL + " بند";
+  $("pr-avg").textContent = fmtAvg(a); $("pr-pct").textContent = pct(a); $("pr-done").textContent = vals.length;
+  const n = prData.notes[prPeriod] || {};
+  $("pr-pos").value = n.positives || ""; $("pr-rec").value = n.recommendations || "";
+  $("pr-pos").readOnly = $("pr-rec").readOnly = !prData.can_score; $("pr-notes-row").hidden = !prData.can_score;
+  $("pr-tnote").textContent = n.teacher_notes ? "إضافات من المعلمة: " + n.teacher_notes : "";
+  renderElements($("pr-elements"), { mine: false, canScore: prData.can_score, period: prPeriod, reports: prData.reports, scores: prData.scores,
+    teacherId: prTeacherId, onChange: () => openTeacher(prTeacherId) });
+}
+document.querySelectorAll("#pr-period button").forEach(b => b.onclick = () => {
+  prPeriod = b.dataset.period;
+  document.querySelectorAll("#pr-period button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderTeacherReview();
+});
+$("pr-back").onclick = () => { $("pr-detail").hidden = true; $("pr-list").hidden = false; loadOverview(); };
+$("pr-q").addEventListener("input", renderOverview);
+$("pr-refresh").onclick = loadOverview;
+$("pr-notes").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const m = $("pr-notes-msg");
+  try { await perf("review_note", { teacher_id: prTeacherId, period: prPeriod, positives: $("pr-pos").value.trim(), recommendations: $("pr-rec").value.trim() });
+    showMsg(m, "تم حفظ ملاحظات المراجعة " + PERIOD_NAME[prPeriod] + ".", true); openTeacher(prTeacherId); }
+  catch (e) { showMsg(m, "تعذّر الحفظ.", false); }
+});
+document.querySelectorAll("#perf-tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#perf-tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  $("pp-mine").hidden = b.dataset.ptab !== "mine"; $("pp-review").hidden = b.dataset.ptab !== "review";
+  if (b.dataset.ptab === "review") { $("pr-detail").hidden = true; $("pr-list").hidden = false; loadOverview(); }
+  else loadMyPerf();
+});
+document.querySelectorAll("#modes button").forEach(b => b.onclick = () => {
+  appMode = b.dataset.mode;
+  document.querySelectorAll("#modes button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  if (curView === "staff" && appMode === "leave") {
+    document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
+    ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
+  }
+  show(curView);
+  if (appMode === "perf") {
+    document.querySelectorAll("#perf-tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.ptab === "mine")));
+    $("pp-mine").hidden = false; $("pp-review").hidden = true;
+    loadMyPerf();
+  }
+});
 
 // ================= BOOT =================
 async function boot() {
@@ -910,7 +1277,7 @@ async function boot() {
         tData = d; renderTeacher();
         if (!isStaff()) { show("teacher"); return; }
         show("staff");
-        document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
+        document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
         ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
         await loadAdmin();
         pollId = setInterval(loadAdmin, 60000);
