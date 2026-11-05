@@ -655,6 +655,7 @@ $("f").addEventListener("submit", async ev => {
     if (data.error) return showMsg(msg, data.error === "too_many" ? "وصلتِ للحد اليومي من الطلبات."
       : data.error === "no_school" ? "هذا اليوم إجازة نهاية الأسبوع."
       : data.error === "past_date" ? "لا يمكن التسجيل في يوم مضى. اختاري اليوم أو تاريخًا قادمًا."
+      : data.error === "duplicate" ? "لديك " + (type === "permission" ? "غياب أو استئذان في نفس الحصة" : "غياب أو استئذان مسجّل") + " يوم " + fmtDate(data.date) + "، ولا يمكن تسجيل نفس اليوم مرتين."
       : data.error === "emergency_full" ? "اكتمل عدد الإجازات الاضطرارية يوم " + fmtDate(data.date) + " (موظفتان). اختاري يومًا آخر أو راجعي الإدارة."
       : data.error === "bad_periods" ? "اختيار الحصص غير صحيح لهذا اليوم."
       : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
@@ -805,7 +806,10 @@ function renderSum() {
     .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
 }
 function renderStaff() {
-  const body = $("staff-body"); body.replaceChildren();
+  const body = $("staff-body");
+  const unsaved = new Map([...body.querySelectorAll("input[data-dirty]")].map(i => [i.id, i.value]));
+  const focused = document.activeElement && body.contains(document.activeElement) ? document.activeElement.id : null;
+  body.replaceChildren();
   if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const me = t.id === session.id;
@@ -849,11 +853,16 @@ function renderStaff() {
       let ok = true;
       try { await staff("set_prior", v); } catch (e) { ok = false; }
       ps.disabled = false; ps.textContent = ok ? "تم ✓" : "تعذّر";
-      if (ok) setTimeout(loadAdmin, 600);
+      if (ok) {
+        fields.forEach(([k, inp]) => { delete inp.dataset.dirty; t["prior_" + k] = v[k]; });
+        t.prior_year = yStartY; t.prior_days = v.emerg + v.sick + v.unexc + v.other;
+        setTimeout(loadAdmin, 600);
+      }
     };
+    fields.forEach(([, inp]) => inp.addEventListener("input", () => { inp.dataset.dirty = "1"; ps.textContent = "حفظ"; }));
     pw.append(ps); priorTd.append(pw); tr.append(priorTd);
     const pinTd = el("td"), wrap = el("div", "inline-in"), pin = el("input", "pin"); pin.inputMode = "numeric"; pin.maxLength = 4; pin.placeholder = "••••"; pin.id = "pin-" + t.id;
-    pin.addEventListener("input", () => pin.value = pin.value.replace(/\D/g, "").slice(0, 4));
+    pin.addEventListener("input", () => { pin.value = pin.value.replace(/\D/g, "").slice(0, 4); pin.dataset.dirty = "1"; });
     pin.placeholder = "تلقائي";
     const save = el("button", "btn ghost sm", "رمز جديد");
     save.onclick = async () => {
@@ -883,6 +892,8 @@ function renderStaff() {
     tog.style.whiteSpace = "nowrap"; if (!me) tog.append(b, el("span", "hint", " · "), del); tr.append(tog);
     body.append(tr);
   });
+  unsaved.forEach((v, id) => { const i = document.getElementById(id); if (i) { i.value = v; i.dataset.dirty = "1"; } });
+  if (focused) document.getElementById(focused)?.focus();
 }
 
 async function decide(r, status, note, act) {
