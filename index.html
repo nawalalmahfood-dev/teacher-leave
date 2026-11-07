@@ -160,6 +160,17 @@ details.el[open] > summary{border-bottom:1px solid var(--line)}
 .grade{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums}
 a.wa{display:inline-block;font:600 .85rem var(--body);padding:5px 12px;border-radius:7px;background:var(--ok);color:var(--surface);text-decoration:none;white-space:nowrap}
 footer{text-align:center}
+.print-only{display:none}
+@media print{
+  body{background:#fff;color:#000}
+  header.top,#modes,#admin .tabs,.no-print,#notice,#p-day,#p-all,#p-sum,#p-staff,#teacher,#perf,#r-title{display:none!important}
+  .print-only{display:block}
+  #p-rep{display:flex!important}
+  .tablebox{overflow:visible;border:0}
+  table{min-width:0;font-size:11px}
+  th,td{padding:4px 6px;border:1px solid #999}
+  .stat{border:1px solid #999}
+}
 @media (max-width:520px){.rec{grid-template-columns:1fr}.rec .why{grid-column:1}h1{font-size:1.35rem}}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style>
@@ -248,6 +259,7 @@ footer{text-align:center}
       <button role="tab" data-tab="all" aria-selected="false">كل الطلبات</button>
       <button role="tab" data-tab="sum" aria-selected="false">ملخص المعلمات</button>
       <button role="tab" data-tab="staff" aria-selected="false" data-mgr>المعلمات والصلاحيات</button>
+      <button role="tab" data-tab="rep" aria-selected="false">التقارير</button>
       <button role="tab" data-tab="mine" aria-selected="false">طلباتي</button>
     </nav>
 
@@ -295,6 +307,40 @@ footer{text-align:center}
         </div>
         <div class="row"><button class="btn sm" type="submit">حفظ الحدود</button><span class="msg" id="l-msg" hidden></span></div>
       </form>
+    </section>
+
+    <section id="p-rep" class="list" style="gap:14px" hidden>
+      <div class="sheet no-print">
+        <h2>تقرير الغياب والاستئذان</h2>
+        <div class="filters">
+          <label>نوع الفترة<select id="r-mode">
+            <option value="hijri">شهر هجري</option><option value="greg">شهر ميلادي</option><option value="range">فترة محددة</option><option value="year">العام الدراسي كاملًا</option>
+          </select></label>
+          <label id="r-month-wrap">الشهر<select id="r-month"></select></label>
+          <label id="r-from-wrap" hidden>من تاريخ<input type="date" id="r-from"></label>
+          <label id="r-to-wrap" hidden>إلى تاريخ<input type="date" id="r-to"></label>
+        </div>
+        <div class="row">
+          <label style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" id="r-all" style="width:auto"> إظهار كل المعلمات (حتى من ليس لها غياب أو استئذان)</label>
+        </div>
+        <div class="row">
+          <button class="btn sm" type="button" id="r-csv">تصدير إلى Excel</button>
+          <button class="btn ghost sm" type="button" id="r-print">طباعة</button>
+        </div>
+        <p class="hint" id="r-note"></p>
+      </div>
+      <div class="print-only"><h2 id="r-ptitle"></h2></div>
+      <h2 id="r-title"></h2>
+      <div class="stats" id="r-stats"></div>
+      <div class="tablebox"><table>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th></tr></thead>
+        <tbody id="r-body"></tbody>
+      </table></div>
+      <h2>التفاصيل يومًا بيوم</h2>
+      <div class="tablebox"><table>
+        <thead><tr><th>التاريخ</th><th>المعلمة</th><th>النوع</th><th>التفاصيل</th><th>الحالة</th></tr></thead>
+        <tbody id="r-detail"></tbody>
+      </table></div>
     </section>
 
     <section id="p-staff" class="list" style="gap:14px" hidden>
@@ -761,7 +807,109 @@ async function loadAdmin() {
   tallies = new Map([...teachers.keys()].map(id => [id, tally(by.get(id) || [], teachers.get(id))]));
   renderAdmin();
 }
-function renderAdmin() { renderDay(); renderAll(); renderSum(); if (isMgr()) renderStaff(); }
+function renderAdmin() { renderDay(); renderAll(); renderSum(); renderReport(); if (isMgr()) renderStaff(); }
+
+// ---------- reports: a Hijri month, a Gregorian month, a date range, or the school year ----------
+const HIJ_MONTH = (() => { try { return new Intl.DateTimeFormat("en-u-ca-islamic-umalqura-nu-latn", { month: "numeric", year: "numeric" }); } catch (e) { return null; } })();
+const HIJ_NAME = (() => { try { return new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", { month: "long", year: "numeric" }); } catch (e) { return null; } })();
+const GREG_NAME = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { month: "long", year: "numeric" });
+// Month ranges inside the school year (1 Aug – 31 Jul), keyed "from|to", newest first.
+function monthRanges(kind) {
+  const out = [], seen = new Map();
+  for (let d = parse(yStart), end = parse(yEnd); d <= end; d.setDate(d.getDate() + 1)) {
+    let key, name;
+    if (kind === "hijri" && HIJ_MONTH) { key = HIJ_MONTH.format(d); name = HIJ_NAME.format(d).replace(/\s*هـ\s*$/, "") + " هـ"; }
+    else { key = d.getFullYear() + "-" + d.getMonth(); name = GREG_NAME.format(d) + " م"; }
+    const day = iso(d);
+    if (!seen.has(key)) { const m = { name, from: day, to: day }; seen.set(key, m); out.push(m); } else seen.get(key).to = day;
+  }
+  return out.filter(m => m.from <= todayISO).reverse();
+}
+function fillMonths() {
+  const sel = $("r-month"), mode = $("r-mode").value, keep = sel.value;
+  sel.replaceChildren();
+  if (mode === "hijri" || mode === "greg") monthRanges(mode).forEach(m => { const o = el("option", null, m.name); o.value = m.from + "|" + m.to; sel.append(o); });
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+function reportRange() {
+  const mode = $("r-mode").value;
+  if (mode === "year") return { from: yStart, to: yEnd, title: yearLabel };
+  if (mode === "range") {
+    const f = $("r-from").value, t = $("r-to").value;
+    if (!f || !t || t < f) return null;
+    return { from: f, to: t, title: "من " + fmtDate(f) + " إلى " + fmtDate(t) };
+  }
+  const v = $("r-month").value; if (!v) return null;
+  const [from, to] = v.split("|");
+  return { from, to, title: $("r-month").selectedOptions[0].textContent + " (" + fmtDate(from) + " – " + fmtDate(to) + ")" };
+}
+// Working days of [a, b] that fall inside [from, to].
+const daysIn = (a, b, from, to) => { const s = a > from ? a : from, e = b < to ? b : to; return s > e ? 0 : workDays(s, e); };
+let lastReport = null;
+function renderReport() {
+  if (!$("r-mode")) return;
+  const mode = $("r-mode").value;
+  $("r-month-wrap").hidden = !(mode === "hijri" || mode === "greg");
+  $("r-from-wrap").hidden = $("r-to-wrap").hidden = mode !== "range";
+  const r = reportRange(), body = $("r-body"), det = $("r-detail"), st = $("r-stats");
+  body.replaceChildren(); det.replaceChildren(); st.replaceChildren();
+  if (!r) { $("r-title").textContent = "اختاري الفترة."; lastReport = null; return; }
+  $("r-title").textContent = "تقرير " + r.title; $("r-ptitle").textContent = "تقرير الغياب والاستئذان — " + r.title;
+  $("r-note").textContent = mode === "year"
+    ? "العام الدراسي كاملًا يشمل الرصيد السابق المدخل لكل معلمة حسب نوعه."
+    : "التقرير يحسب ما سُجّل في المنصة خلال الفترة: الغياب المسجّل والإجازات الاضطرارية المعتمدة، والاستئذان المعتمد. الرصيد السابق غير مؤرخ فلا يدخل إلا في تقرير العام الدراسي كاملًا.";
+  const rows = new Map(), details = [];
+  const row = t => { if (!rows.has(t.id)) rows.set(t.id, { t, emerg: 0, sick: 0, unexc: 0, other: 0, days: 0, perms: 0, periods: 0 }); return rows.get(t.id); };
+  if ($("r-all").checked) teachers.forEach(row);
+  reqs.forEach(q => {
+    const t = teachers.get(q.teacher_id); if (!t || q.status !== "approved") return;
+    if (q.type === "absence") {
+      const n = daysIn(q.date_from, q.date_to, r.from, r.to); if (!n) return;
+      const x = row(t), k = absKind(q); x[k] += n; x.days += n;
+      details.push({ date: q.date_from < r.from ? r.from : q.date_from, t, type: "غياب", info: q.reason + (n > 1 ? " — " + n + " أيام" : ""), q });
+    } else if (q.date_from >= r.from && q.date_from <= r.to) {
+      const x = row(t), ps = q.periods || []; x.perms++; x.periods += ps.length;
+      details.push({ date: q.date_from, t, type: "استئذان", info: ps.length ? periodsText(ps) : whenText(q), q });
+    }
+  });
+  if (mode === "year") teachers.forEach(t => {
+    if (t.prior_year !== yStartY || !(t.prior_days || t.prior_perms)) return;
+    const x = row(t);
+    ["emerg", "sick", "unexc", "other"].forEach(k => { x[k] += t["prior_" + k] || 0; x.days += t["prior_" + k] || 0; });
+    x.perms += t.prior_perms || 0;
+  });
+  const list = [...rows.values()].sort((a, b) => b.days - a.days || b.perms - a.perms || a.t.name.localeCompare(b.t.name, "ar"));
+  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, days: 0, perms: 0, periods: 0 };
+  list.forEach(x => {
+    const tr = el("tr");
+    [x.t.name, x.t.specialty || "—", x.emerg, x.sick, x.unexc, x.other, x.days, x.perms, x.periods].forEach(v => tr.append(el("td", null, String(v))));
+    tr.children[6].style.fontWeight = "700"; body.append(tr);
+    Object.keys(tot).forEach(k => tot[k] += x[k]);
+  });
+  if (!list.length) { const tr = el("tr"), td = el("td", null, "لا يوجد غياب أو استئذان في هذه الفترة."); td.colSpan = 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); }
+  else { const tr = el("tr"); ["الإجمالي (" + list.length + " معلمة)", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.days, tot.perms, tot.periods].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); }); body.append(tr); }
+  [["a", tot.days, "إجمالي أيام الغياب"], ["a", tot.emerg, "اضطراري"], ["a", tot.sick, "مرضي"], ["a", tot.unexc, "بدون عذر"], ["a", tot.other, "أخرى"], ["p", tot.perms, "مرات الاستئذان"], ["p", tot.periods, "حصص الاستئذان"]]
+    .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
+  details.sort((a, b) => a.date.localeCompare(b.date) || a.t.name.localeCompare(b.t.name, "ar"));
+  details.forEach(d => { const tr = el("tr"); [fmtDate(d.date), d.t.name, d.type, d.info, d.q.type === "absence" && !needsApproval(d.q) ? "مسجّل" : ST[d.q.status]].forEach(v => tr.append(el("td", null, v))); det.append(tr); });
+  if (!details.length) { const tr = el("tr"), td = el("td", null, mode === "year" ? "لا توجد سجلات مؤرخة في المنصة (الرصيد السابق غير مؤرخ)." : "لا توجد سجلات في هذه الفترة."); td.colSpan = 5; td.style.textAlign = "center"; tr.append(td); det.append(tr); }
+  lastReport = { r, list, tot, details };
+}
+["r-mode"].forEach(id => $(id).addEventListener("change", () => { fillMonths(); renderReport(); }));
+["r-month", "r-from", "r-to", "r-all"].forEach(id => $(id).addEventListener("input", renderReport));
+$("r-from").value = todayISO.slice(0, 8) + "01"; $("r-to").value = todayISO;
+fillMonths();
+$("r-print").onclick = () => { if (lastReport) window.print(); };
+$("r-csv").onclick = () => {
+  if (!lastReport) return;
+  const { r, list, tot, details } = lastReport;
+  const rows = [["تقرير الغياب والاستئذان — " + r.title], [],
+    ["المعلمة", "التخصص", "اضطراري", "مرضي", "بدون عذر", "أخرى", "إجمالي أيام الغياب", "مرات الاستئذان", "حصص الاستئذان"],
+    ...list.map(x => [x.t.name, x.t.specialty, x.emerg, x.sick, x.unexc, x.other, x.days, x.perms, x.periods]),
+    ["الإجمالي", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.days, tot.perms, tot.periods], [],
+    ["التاريخ", "المعلمة", "النوع", "التفاصيل"], ...details.map(d => [d.date, d.t.name, d.type, d.info])];
+  csvDownload(rows, "تقرير-غياب-" + r.from + "-" + r.to + ".csv");
+};
 
 function renderDay() {
   const day = $("d-date").value || todayISO;
@@ -1054,7 +1202,7 @@ $("a-csv").onclick = () => {
 
 document.querySelectorAll("#admin .tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
-  ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
+  ["day", "all", "sum", "rep", "staff"].forEach(t => $("p-" + t).hidden = t !== b.dataset.tab);
   // «طلباتي» shows the staff member's own balance, form and requests.
   $("teacher").hidden = b.dataset.tab !== "mine";
   if (b.dataset.tab === "mine") renderTeacher();
@@ -1352,7 +1500,7 @@ document.querySelectorAll("#modes button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#modes button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
   if (curView === "staff" && appMode === "leave") {
     document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
-    ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
+    ["day", "all", "sum", "rep", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
   }
   show(curView);
   if (appMode === "perf") {
@@ -1376,7 +1524,7 @@ async function boot() {
         if (!isStaff()) { show("teacher"); return; }
         show("staff");
         document.querySelectorAll("#admin .tabs button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.tab === "day")));
-        ["day", "all", "sum", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
+        ["day", "all", "sum", "rep", "staff"].forEach(t => $("p-" + t).hidden = t !== "day");
         await loadAdmin();
         pollId = setInterval(loadAdmin, 60000);
         return;
