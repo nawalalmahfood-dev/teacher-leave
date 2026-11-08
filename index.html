@@ -273,6 +273,19 @@ footer{text-align:center}
         <div class="stat p"><b id="s-per">0</b><span>مستأذنات</span></div>
         <div class="stat w"><b id="s-wait">0</b><span>بانتظار الاعتماد (الكل)</span></div>
       </div>
+      <form class="sheet" id="ma" novalidate data-mgr>
+        <h2>تسجيل غياب موظفة</h2>
+        <p class="hint">لمن غابت ولم تسجّل غيابها بنفسها. يُسجَّل مباشرة ويظهر عندها بأنه «سجّلته الإدارة».</p>
+        <div class="grid">
+          <label>الموظفة<select id="ma-t"></select></label>
+          <label>التاريخ<input type="date" id="ma-date"></label>
+          <label>سبب الغياب<select id="ma-reason">
+            <option>غياب بدون عذر</option><option>إجازة مرضية</option><option>إجازة اضطرارية</option><option>مرافقة مريض</option>
+            <option>ظرف أسري</option><option>إجازة وفاة</option><option>أخرى</option></select></label>
+          <label>ملاحظة (اختياري)<input id="ma-notes" maxlength="300"></label>
+        </div>
+        <div class="row"><button class="btn sm" type="submit">تسجيل الغياب</button><span class="msg" id="ma-msg" hidden></span></div>
+      </form>
       <div id="day-list" class="list"></div>
     </section>
 
@@ -489,7 +502,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const showMsg = (node, text, good) => { node.textContent = text; node.className = "msg " + (good ? "good" : "bad"); node.hidden = false; };
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 
-$("today").textContent = fmtDate(todayISO) + (HIJRI ? " · " + HIJRI.format(new Date()) + " هـ" : "");
+$("today").textContent = fmtDate(todayISO) + (HIJRI ? " · " + HIJRI.format(new Date()).replace(/\s*هـ\s*$/, "") + " هـ" : "");
 
 // Academic year: 1 August to 31 July.
 const now = new Date();
@@ -730,7 +743,8 @@ function card(r, opts) {
   // Absences are recorded directly, with no approval step.
   const isAbs = r.type === "absence";
   c.append(mid, el("span", "st " + r.status, isAbs && !needsApproval(r) && r.status === "approved" ? "مسجّل" : ST[r.status]));
-  c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")));
+  c.append(el("div", "why", r.reason + (r.notes ? " — " + r.notes : "") + (r.admin_note ? "  |  ملاحظة الإدارة: " + r.admin_note : "")
+    + (r.recorded_by && r.recorded_by !== r.teacher_id ? "  |  سجّلته الإدارة" : "")));
   if (opts.admin) {
     const act = el("div", "act");
     if (!needsApproval(r) || !isMgr()) {
@@ -947,6 +961,14 @@ $("r-csv").onclick = () => {
 
 function renderDay() {
   const day = $("d-date").value || todayISO;
+  if (isMgr()) {
+    const sel = $("ma-t"), keep = sel.value;
+    sel.replaceChildren(el("option", null, "— اختاري —")); sel.options[0].value = "";
+    [...teachers.values()].filter(t => t.active).sort((a, b) => a.name.localeCompare(b.name, "ar"))
+      .forEach(t => { const o = el("option", null, t.name); o.value = t.id; sel.append(o); });
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+    if (!$("ma-date").value) $("ma-date").value = day;
+  }
   const items = reqs.filter(x => covers(x, day) && x.status !== "rejected");
   $("s-abs").textContent = items.filter(x => x.type === "absence").length;
   $("s-per").textContent = items.filter(x => x.type === "permission").length;
@@ -1242,7 +1264,23 @@ document.querySelectorAll("#admin .tabs button").forEach(b => b.addEventListener
   if (b.dataset.tab === "mine") renderTeacher();
 }));
 ["a-q", "a-type", "a-st", "a-from", "a-to"].forEach(id => $(id).addEventListener("input", renderAll));
-$("d-date").addEventListener("input", renderDay);
+$("d-date").addEventListener("input", () => { $("ma-date").value = $("d-date").value; renderDay(); });
+$("ma").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const m = $("ma-msg"), btn = $("ma").querySelector("button"), tid = $("ma-t").value, date = $("ma-date").value;
+  if (!tid || !date) { showMsg(m, "اختاري الموظفة والتاريخ.", false); return; }
+  btn.disabled = true;
+  try {
+    await staff("add_absence", { teacher_id: tid, date, reason: $("ma-reason").value, notes: $("ma-notes").value.trim() });
+    showMsg(m, "سُجّل غياب " + teachers.get(tid).name + " يوم " + fmtDate(date) + ".", true);
+    $("ma-t").value = ""; $("ma-notes").value = "";
+    loadAdmin();
+  } catch (e) {
+    showMsg(m, /duplicate/.test(e.message) ? "لها غياب أو استئذان مسجّل في هذا اليوم مسبقًا."
+      : /no_school/.test(e.message) ? "هذا اليوم إجازة نهاية أسبوع."
+      : /out_of_year/.test(e.message) ? "التاريخ خارج العام الدراسي الحالي." : "تعذّر التسجيل، حاولي مرة أخرى.", false);
+  } finally { btn.disabled = false; }
+});
 $("refresh").onclick = loadAdmin;
 
 // ================= JOB PERFORMANCE =================
