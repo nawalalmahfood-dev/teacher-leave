@@ -333,7 +333,7 @@ footer{text-align:center}
       <h2 id="r-title"></h2>
       <div class="stats" id="r-stats"></div>
       <div class="tablebox"><table>
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>اضطراري</th><th>مرضي</th><th>بدون عذر</th><th>أخرى</th><th id="r-uncl-h" hidden>غير مصنّف</th><th>إجمالي أيام الغياب</th><th>مرات الاستئذان</th><th>حصص الاستئذان</th></tr></thead>
         <tbody id="r-body"></tbody>
       </table></div>
       <h2>التفاصيل يومًا بيوم</h2>
@@ -800,6 +800,8 @@ async function loadAdmin() {
   if (d.role !== myRole) { myRole = d.role; show("staff"); }
   teachers = new Map(d.teachers.map(x => [x.id, x]));
   reqs = d.requests.filter(x => teachers.has(x.teacher_id));
+  priorEntries = (d.prior_entries || []).filter(x => teachers.has(x.teacher_id))
+    .map(x => ({ ...x, other: (x.other || 0) + (x.unclass || 0), unclass: 0 })); // days of unknown type count as «أخرى»
   if (d.limits) limits = d.limits;
   if (isMgr()) { try { (await perf("overview")).teachers.forEach(x => perfRoles.set(x.id, x.perf_role)); } catch (e) {} }
   Object.keys(limits).forEach(k => { const i = $("l-" + k); if (i && document.activeElement !== i) i.value = limits[k]; });
@@ -845,7 +847,26 @@ function reportRange() {
 }
 // Working days of [a, b] that fall inside [from, to].
 const daysIn = (a, b, from, to) => { const s = a > from ? a : from, e = b < to ? b : to; return s > e ? 0 : workDays(s, e); };
-let lastReport = null;
+let lastReport = null, priorEntries = [];
+const PK = ["emerg", "sick", "unexc", "other", "unclass"];
+const KNAME = { emerg: "اضطراري", sick: "مرضي", unexc: "بدون عذر", other: "أخرى", unclass: "غير مصنّف" };
+const entryText = e => PK.filter(k => e[k]).map(k => KNAME[k] + " " + e[k]).join("، ");
+// Prior-balance entries that fall inside [from, to]. Day entries go by their date; the
+// Rabi I–II list is used as one block when the range covers it all (exact categories),
+// otherwise month by month (a month's split by category may be unknown → unclass).
+// Months only partly inside the range can't be split and are reported in `partial`.
+function priorIn(from, to) {
+  const out = [], partial = new Set();
+  const inside = e => e.date_from >= from && e.date_to <= to, touches = e => e.date_from <= to && e.date_to >= from;
+  const blocks = priorEntries.filter(e => e.kind === "block");
+  const blockOn = blocks.length && blocks.every(inside);
+  priorEntries.forEach(e => {
+    if (e.kind === "day") { if (inside(e)) out.push(e); }
+    else if (e.kind === "block") { if (blockOn) out.push(e); }
+    else if (!blockOn) { if (inside(e)) out.push(e); else if (touches(e)) partial.add(e.date_from + "|" + e.date_to); }
+  });
+  return { out, partial: [...partial].sort() };
+}
 function renderReport() {
   if (!$("r-mode")) return;
   const mode = $("r-mode").value;
@@ -855,11 +876,8 @@ function renderReport() {
   body.replaceChildren(); det.replaceChildren(); st.replaceChildren();
   if (!r) { $("r-title").textContent = "اختاري الفترة."; lastReport = null; return; }
   $("r-title").textContent = "تقرير " + r.title; $("r-ptitle").textContent = "تقرير الغياب والاستئذان — " + r.title;
-  $("r-note").textContent = mode === "year"
-    ? "العام الدراسي كاملًا يشمل الرصيد السابق المدخل لكل معلمة حسب نوعه."
-    : "التقرير يحسب ما سُجّل في المنصة خلال الفترة: الغياب المسجّل والإجازات الاضطرارية المعتمدة، والاستئذان المعتمد. الرصيد السابق غير مؤرخ فلا يدخل إلا في تقرير العام الدراسي كاملًا.";
   const rows = new Map(), details = [];
-  const row = t => { if (!rows.has(t.id)) rows.set(t.id, { t, emerg: 0, sick: 0, unexc: 0, other: 0, days: 0, perms: 0, periods: 0 }); return rows.get(t.id); };
+  const row = t => { if (!rows.has(t.id)) rows.set(t.id, { t, emerg: 0, sick: 0, unexc: 0, other: 0, unclass: 0, days: 0, perms: 0, periods: 0 }); return rows.get(t.id); };
   if ($("r-all").checked) teachers.forEach(row);
   reqs.forEach(q => {
     const t = teachers.get(q.teacher_id); if (!t || q.status !== "approved") return;
@@ -872,28 +890,43 @@ function renderReport() {
       details.push({ date: q.date_from, t, type: "استئذان", info: ps.length ? periodsText(ps) : whenText(q), q });
     }
   });
+  const pr = priorIn(r.from, r.to);
   if (mode === "year") teachers.forEach(t => {
     if (t.prior_year !== yStartY || !(t.prior_days || t.prior_perms)) return;
     const x = row(t);
     ["emerg", "sick", "unexc", "other"].forEach(k => { x[k] += t["prior_" + k] || 0; x.days += t["prior_" + k] || 0; });
     x.perms += t.prior_perms || 0;
   });
+  pr.out.forEach(e => {
+    const t = teachers.get(e.teacher_id), n = PK.reduce((a, k) => a + (e[k] || 0), 0); if (!t || !n) return;
+    if (mode !== "year") { const x = row(t); PK.forEach(k => x[k] += e[k] || 0); x.days += n; }
+    details.push({ date: e.date_from, t, type: "غياب (رصيد سابق)", prior: true,
+      info: e.kind === "day" ? "كشف الحضور — " + entryText(e) : "كشف الغياب " + (e.kind === "block" ? "(ربيع الأول وربيع الآخر)" : "(" + fmtDate(e.date_from) + " – " + fmtDate(e.date_to) + ")") + " — " + (n === 1 ? "يوم واحد" : n === 2 ? "يومان" : n + " أيام") + ": " + entryText(e) });
+  });
+  const pnames = pr.partial.map(k => { const [a, b] = k.split("|"); return fmtDate(a) + " – " + fmtDate(b); });
+  $("r-note").textContent = (mode === "year"
+    ? "العام الدراسي كاملًا يشمل الرصيد السابق المدخل لكل معلمة حسب نوعه."
+    : "التقرير يشمل ما سُجّل في المنصة (الغياب المسجّل، والإجازات الاضطرارية والاستئذان المعتمد) ويشمل الأيام السابقة: كشوف الحضور بتاريخها، وكشف غياب ربيع الأول وربيع الآخر بالشهر.")
+    + (mode !== "year" && pr.out.some(e => e.kind === "month") ? " أيام كشف الغياب غير معروفة النوع في الشهر محسوبة ضمن «أخرى»." : "")
+    + (pnames.length ? " لم يُحسب رصيد الفترة " + pnames.join(" و") + " لأنها تقع جزئيًا خارج التقرير؛ اختاري فترة تشملها كاملة." : "");
   const list = [...rows.values()].sort((a, b) => b.days - a.days || b.perms - a.perms || a.t.name.localeCompare(b.t.name, "ar"));
-  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, days: 0, perms: 0, periods: 0 };
+  const tot = { emerg: 0, sick: 0, unexc: 0, other: 0, unclass: 0, days: 0, perms: 0, periods: 0 };
+  list.forEach(x => Object.keys(tot).forEach(k => tot[k] += x[k]));
+  const showU = tot.unclass > 0; $("r-uncl-h").hidden = !showU;
+  const cols = x => [x.emerg, x.sick, x.unexc, x.other, ...(showU ? [x.unclass] : []), x.days, x.perms, x.periods];
   list.forEach(x => {
     const tr = el("tr");
-    [x.t.name, x.t.specialty || "—", x.emerg, x.sick, x.unexc, x.other, x.days, x.perms, x.periods].forEach(v => tr.append(el("td", null, String(v))));
-    tr.children[6].style.fontWeight = "700"; body.append(tr);
-    Object.keys(tot).forEach(k => tot[k] += x[k]);
+    [x.t.name, x.t.specialty || "—", ...cols(x)].forEach(v => tr.append(el("td", null, String(v))));
+    tr.children[showU ? 7 : 6].style.fontWeight = "700"; body.append(tr);
   });
-  if (!list.length) { const tr = el("tr"), td = el("td", null, "لا يوجد غياب أو استئذان في هذه الفترة."); td.colSpan = 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); }
-  else { const tr = el("tr"); ["الإجمالي (" + list.length + " معلمة)", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.days, tot.perms, tot.periods].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); }); body.append(tr); }
-  [["a", tot.days, "إجمالي أيام الغياب"], ["a", tot.emerg, "اضطراري"], ["a", tot.sick, "مرضي"], ["a", tot.unexc, "بدون عذر"], ["a", tot.other, "أخرى"], ["p", tot.perms, "مرات الاستئذان"], ["p", tot.periods, "حصص الاستئذان"]]
+  if (!list.length) { const tr = el("tr"), td = el("td", null, "لا يوجد غياب أو استئذان في هذه الفترة."); td.colSpan = showU ? 10 : 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); }
+  else { const tr = el("tr"); ["الإجمالي (" + list.length + " معلمة)", "", ...cols(tot)].forEach(v => { const td = el("td", null, String(v)); td.style.fontWeight = "700"; td.style.background = "var(--sunk)"; tr.append(td); }); body.append(tr); }
+  [["a", tot.days, "إجمالي أيام الغياب"], ["a", tot.emerg, "اضطراري"], ["a", tot.sick, "مرضي"], ["a", tot.unexc, "بدون عذر"], ["a", tot.other, "أخرى"], ...(showU ? [["a", tot.unclass, "غير مصنّف"]] : []), ["p", tot.perms, "مرات الاستئذان"], ["p", tot.periods, "حصص الاستئذان"]]
     .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
   details.sort((a, b) => a.date.localeCompare(b.date) || a.t.name.localeCompare(b.t.name, "ar"));
-  details.forEach(d => { const tr = el("tr"); [fmtDate(d.date), d.t.name, d.type, d.info, d.q.type === "absence" && !needsApproval(d.q) ? "مسجّل" : ST[d.q.status]].forEach(v => tr.append(el("td", null, v))); det.append(tr); });
-  if (!details.length) { const tr = el("tr"), td = el("td", null, mode === "year" ? "لا توجد سجلات مؤرخة في المنصة (الرصيد السابق غير مؤرخ)." : "لا توجد سجلات في هذه الفترة."); td.colSpan = 5; td.style.textAlign = "center"; tr.append(td); det.append(tr); }
-  lastReport = { r, list, tot, details };
+  details.forEach(d => { const tr = el("tr"); [fmtDate(d.date), d.t.name, d.type, d.info, d.prior ? "رصيد سابق" : d.q.type === "absence" && !needsApproval(d.q) ? "مسجّل" : ST[d.q.status]].forEach(v => tr.append(el("td", null, v))); det.append(tr); });
+  if (!details.length) { const tr = el("tr"), td = el("td", null, "لا توجد سجلات في هذه الفترة."); td.colSpan = 5; td.style.textAlign = "center"; tr.append(td); det.append(tr); }
+  lastReport = { r, list, tot, details, showU };
 }
 ["r-mode"].forEach(id => $(id).addEventListener("change", () => { fillMonths(); renderReport(); }));
 ["r-month", "r-from", "r-to", "r-all"].forEach(id => $(id).addEventListener("input", renderReport));
@@ -902,11 +935,12 @@ fillMonths();
 $("r-print").onclick = () => { if (lastReport) window.print(); };
 $("r-csv").onclick = () => {
   if (!lastReport) return;
-  const { r, list, tot, details } = lastReport;
+  const { r, list, tot, details, showU } = lastReport;
+  const cols = x => [x.emerg, x.sick, x.unexc, x.other, ...(showU ? [x.unclass] : []), x.days, x.perms, x.periods];
   const rows = [["تقرير الغياب والاستئذان — " + r.title], [],
-    ["المعلمة", "التخصص", "اضطراري", "مرضي", "بدون عذر", "أخرى", "إجمالي أيام الغياب", "مرات الاستئذان", "حصص الاستئذان"],
-    ...list.map(x => [x.t.name, x.t.specialty, x.emerg, x.sick, x.unexc, x.other, x.days, x.perms, x.periods]),
-    ["الإجمالي", "", tot.emerg, tot.sick, tot.unexc, tot.other, tot.days, tot.perms, tot.periods], [],
+    ["المعلمة", "التخصص", "اضطراري", "مرضي", "بدون عذر", "أخرى", ...(showU ? ["غير مصنّف"] : []), "إجمالي أيام الغياب", "مرات الاستئذان", "حصص الاستئذان"],
+    ...list.map(x => [x.t.name, x.t.specialty, ...cols(x)]),
+    ["الإجمالي", "", ...cols(tot)], [],
     ["التاريخ", "المعلمة", "النوع", "التفاصيل"], ...details.map(d => [d.date, d.t.name, d.type, d.info])];
   csvDownload(rows, "تقرير-غياب-" + r.from + "-" + r.to + ".csv");
 };
