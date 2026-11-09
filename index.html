@@ -392,13 +392,13 @@ footer{text-align:center}
           <label>الرمز (اختياري)<input id="n-pin" class="pin" inputmode="numeric" maxlength="4"></label>
         </div>
         <div class="row"><button class="btn sm" type="submit">إضافة</button><button class="btn ghost sm" type="button" id="n-rand">رمز عشوائي</button><span class="msg" id="n-msg" hidden></span></div>
-        <p class="hint">اتركي الرمز فارغًا ليُنشأ تلقائيًا. الرمز لا يمكن عرضه لاحقًا، لكن تقدرين تغييرينه في أي وقت.</p>
+        <p class="hint">اتركي الرمز فارغًا ليُنشأ تلقائيًا. الرمز يبقى ظاهرًا لك في جدول المعلمات مع زر واتساب لإرساله في أي وقت.</p>
       </form>
       <p class="hint"><b>صلاحية الأداء:</b> «مقيّمة» ترى شواهد كل المعلمات وتقدّر البنود وتكتب الإيجابيات والتوصيات، واعتماد الشواهد أو رفضها للمديرة فقط. «اطلاع» ترى الشواهد والتقديرات فقط. المديرة لها كل صلاحيات الأداء تلقائيًا.</p>
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب حسب نوعها (اضطراري، مرضي، بدون عذر، أخرى) ومرات الاستئذان قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وإحصائية كل نوع.</p>
       <div class="tablebox"><table class="staff-table">
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th><th>رمز جديد</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الرمز وإرساله</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -1076,12 +1076,21 @@ function renderStaff() {
       try { res = await staff("set_pin", { teacher_id: t.id, pin: pin.value }); } catch (e) {}
       save.disabled = false;
       if (!res) { save.textContent = "تعذّر"; return; }
-      pin.value = ""; save.textContent = "الرمز: " + res.pin;
+      pin.value = ""; delete pin.dataset.dirty; save.textContent = "رمز جديد"; t.pin = res.pin;
       if (me) { session.pin = res.pin; if (store.get("leave.session")) store.set("leave.session", JSON.stringify(session)); }
-      const wa = waLink(t.phone, t.name, res.pin);
-      if (wa) wrap.append(wa);
+      showPin();
     };
-    wrap.append(pin, save); pinTd.append(wrap); tr.append(pinTd);
+    // The saved PIN and a WhatsApp button stay visible, so the details can be resent at any time.
+    const cur2 = el("div", "inline-in"); cur2.style.marginBottom = "6px";
+    const showPin = () => {
+      cur2.replaceChildren();
+      if (!t.pin) { cur2.append(el("span", "hint", "يظهر الرمز تلقائيًا بعد أول دخول لها للمنصة")); return; }
+      const code = el("b", null, t.pin); code.dir = "ltr"; code.style.letterSpacing = "2px";
+      cur2.append(el("span", "hint", "الرمز: "), code);
+      const wa = waLink(t.phone, t.name, t.pin); cur2.append(wa || el("span", "hint", "لا يوجد جوال"));
+    };
+    showPin();
+    wrap.append(pin, save); pinTd.append(cur2, wrap); tr.insertBefore(pinTd, tr.children[3]);
     const tog = el("td"), b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
     b.onclick = async () => { b.disabled = true; try { await staff("set_active", { teacher_id: t.id, active: !t.active }); } catch (e) {} loadAdmin(); };
     const del = el("button", "link", "حذف"); del.style.color = "var(--absent)";
