@@ -241,6 +241,7 @@ footer{text-align:center}
         </div>
       </div>
       <div class="calc" id="calc"></div>
+      <div class="alert high" id="f-emerg" hidden></div>
       <label>ملاحظات<textarea id="f-notes" maxlength="1000" placeholder="تفاصيل إضافية للإدارة، مثل الحصص التي تحتاج انتظار"></textarea></label>
       <div class="row">
         <button class="btn" id="f-submit" type="submit">إرسال الطلب</button>
@@ -672,7 +673,21 @@ function renderPeriods() {
 }
 $("f-pdate").addEventListener("input", () => { renderPeriods(); calc(); });
 ["f-from", "f-to", "f-areason"].forEach(id => $(id).addEventListener("input", calc));
+// Emergency absence is capped at two staff per day: warn as soon as a full day is picked.
+let emergSeq = 0;
+async function checkEmerg() {
+  const box = $("f-emerg"), seq = ++emergSeq;
+  const from = $("f-from").value, to = $("f-to").value || from;
+  if (!session || type !== "absence" || $("f-areason").value !== EMERGENCY || !from || to < from) { box.hidden = true; $("f-submit").disabled = false; return; }
+  let full = [];
+  try { const { data } = await sb.rpc("leave_emergency_full", { p_teacher: session.id, p_pin: session.pin, p_from: from, p_to: to }); full = (data && data.full) || []; } catch (e) {}
+  if (seq !== emergSeq) return;
+  box.hidden = !full.length; $("f-submit").disabled = !!full.length;
+  if (full.length) box.textContent = "تم تجاوز العدد المسموح لحجز الغياب الاضطراري في " + (full.length === 1 ? "يوم " : "الأيام: ") + full.map(fmtDate).join("، ")
+    + " (الحد موظفتان في اليوم). اختاري يومًا آخر أو نوع غياب آخر، أو راجعي الإدارة.";
+}
 function calc() {
+  checkEmerg();
   const c = $("calc");
   if (type === "absence") {
     const a = $("f-from").value, b = $("f-to").value;
@@ -717,7 +732,7 @@ $("f").addEventListener("submit", async ev => {
       : data.error === "no_school" ? "هذا اليوم إجازة نهاية الأسبوع."
       : data.error === "past_date" ? "لا يمكن التسجيل في يوم مضى. اختاري اليوم أو تاريخًا قادمًا."
       : data.error === "duplicate" ? "لديك " + (type === "permission" ? "غياب أو استئذان في نفس الحصة" : "غياب أو استئذان مسجّل") + " يوم " + fmtDate(data.date) + "، ولا يمكن تسجيل نفس اليوم مرتين."
-      : data.error === "emergency_full" ? "اكتمل عدد الإجازات الاضطرارية يوم " + fmtDate(data.date) + " (موظفتان). اختاري يومًا آخر أو راجعي الإدارة."
+      : data.error === "emergency_full" ? "تم تجاوز العدد المسموح لحجز الغياب الاضطراري يوم " + fmtDate(data.date) + " (الحد موظفتان في اليوم). اختاري يومًا آخر أو راجعي الإدارة."
       : data.error === "bad_periods" ? "اختيار الحصص غير صحيح لهذا اليوم."
       : "انتهت صلاحية الدخول، سجلي دخولك من جديد.", false);
     chosen.clear(); renderPeriods();
@@ -726,7 +741,7 @@ $("f").addEventListener("submit", async ev => {
       : data.status === "pending" ? "تم إرسال طلب الإجازة الاضطرارية إلى المديرة للاعتماد." : "تم تسجيل غيابك.", true);
     tData = await fetchTeacher(); renderTeacher();
   } catch (e) { showMsg(msg, "تعذّر الإرسال. تأكدي من الإنترنت وحاولي مرة أخرى.", false); }
-  finally { $("f-submit").disabled = false; }
+  finally { $("f-submit").disabled = false; checkEmerg(); }
 });
 
 // ---------- shared card ----------
