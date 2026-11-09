@@ -97,17 +97,19 @@ th{background:var(--sunk);font-weight:600;color:var(--muted);font-size:.8rem}
 tr:last-child td{border-bottom:0}
 /* compact controls inside tables (the teachers table has a lot per row) */
 .tablebox td input,.tablebox td select{font-size:.85rem;padding:4px 8px;border-radius:6px;width:auto}
-.tablebox td input.pin{font-size:.9rem;letter-spacing:.15em;width:76px}
+.tablebox td input.pin{font-size:.9rem;letter-spacing:.15em;width:64px}
 .tablebox td input[type="number"]{width:56px!important}
 .tablebox td .btn.sm{padding:4px 10px;font-size:.8rem}
 .tablebox td:first-child{min-width:170px}
 .tablebox td .inline-in{gap:4px;flex-wrap:nowrap}
-.staff-table{min-width:1350px}
-.prior-in{display:flex;gap:6px;align-items:flex-end}
-.prior-in label{font-size:.7rem;font-weight:600;gap:2px;color:var(--muted)}
+.staff-table{min-width:100%}
+.prior-in{display:grid;grid-template-columns:repeat(3,52px);gap:4px 6px;align-items:end;justify-content:start}
+.prior-in label{font-size:.7rem;font-weight:600;gap:2px;color:var(--muted);white-space:nowrap}
 .prior-in input{width:52px!important}
-.staff-table td{padding:8px 10px;white-space:nowrap}
-.staff-table td:first-child{white-space:normal}
+.staff-table td{padding:8px 8px;white-space:nowrap}
+.staff-table td:first-child{white-space:normal;min-width:120px}
+.staff-table th{white-space:normal}
+.staff-table select{padding:5px 22px 5px 6px;font-size:.85rem}
 .note-in{flex:1 1 180px}
 .alert{border-radius:8px;padding:12px 14px;font-weight:600;line-height:1.7}
 .alert.good{background:var(--ok-soft);color:var(--ok)}
@@ -398,7 +400,7 @@ footer{text-align:center}
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب حسب نوعها (اضطراري، مرضي، بدون عذر، أخرى) ومرات الاستئذان قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وإحصائية كل نوع.</p>
       <div class="tablebox"><table class="staff-table">
-        <thead><tr><th>المعلمة</th><th>التخصص</th><th>الجوال</th><th>الرمز وإرساله</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th>رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th><th></th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>الجوال</th><th>الرمز وإرساله</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th style="min-width:180px">رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th><th></th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -1014,11 +1016,11 @@ function renderStaff() {
   const unsaved = new Map([...body.querySelectorAll("input[data-dirty]")].map(i => [i.id, i.value]));
   const focused = document.activeElement && body.contains(document.activeElement) ? document.activeElement.id : null;
   body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 9; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 8; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const me = t.id === session.id;
     const tr = el("tr");
-    tr.append(el("td", null, t.name), el("td", null, t.specialty || "—"));
+    const nmTd = el("td", null, t.name); if (t.specialty) { nmTd.append(el("br"), el("span", "hint", t.specialty)); } tr.append(nmTd);
     const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
@@ -1090,7 +1092,7 @@ function renderStaff() {
       const wa = waLink(t.phone, t.name, t.pin); cur2.append(wa || el("span", "hint", "لا يوجد جوال"));
     };
     showPin();
-    wrap.append(pin, save); pinTd.append(cur2, wrap); tr.insertBefore(pinTd, tr.children[3]);
+    wrap.append(pin, save); pinTd.append(cur2, wrap); tr.insertBefore(pinTd, tr.children[2]);
     const tog = el("td"), b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
     b.onclick = async () => { b.disabled = true; try { await staff("set_active", { teacher_id: t.id, active: !t.active }); } catch (e) {} loadAdmin(); };
     const del = el("button", "link", "حذف"); del.style.color = "var(--absent)";
@@ -1102,7 +1104,7 @@ function renderStaff() {
       catch (e) { del.disabled = false; del.textContent = "تعذّر الحذف"; return; }
       loadAdmin();
     };
-    tog.style.whiteSpace = "nowrap"; if (!me) tog.append(b, el("span", "hint", " · "), del); tr.append(tog);
+    if (!me) tog.append(b, el("br"), del); tr.append(tog);
     body.append(tr);
   });
   unsaved.forEach((v, id) => { const i = document.getElementById(id); if (i) { i.value = v; i.dataset.dirty = "1"; } });
