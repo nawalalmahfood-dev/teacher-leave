@@ -103,9 +103,9 @@ tr:last-child td{border-bottom:0}
 .tablebox td:first-child{min-width:170px}
 .tablebox td .inline-in{gap:4px;flex-wrap:nowrap}
 .staff-table{min-width:100%}
-.prior-in{display:grid;grid-template-columns:repeat(3,52px);gap:4px 6px;align-items:end;justify-content:start}
+.prior-in{display:grid;grid-template-columns:repeat(3,46px);gap:4px 6px;align-items:end;justify-content:start}
 .prior-in label{font-size:.7rem;font-weight:600;gap:2px;color:var(--muted);white-space:nowrap}
-.prior-in input{width:52px!important}
+.prior-in input{width:46px!important}
 .staff-table td{padding:8px 8px;white-space:nowrap}
 .staff-table td:first-child{white-space:normal;min-width:110px}
 .staff-table th{white-space:normal}
@@ -401,7 +401,7 @@ footer{text-align:center}
       <p class="hint"><b>الصلاحيات:</b> «معلمة» ترى طلباتها فقط. «اطلاع فقط» ترى كل الطلبات والملخص. «اطلاع وحذف» ترى كل الطلبات وتلغي أي غياب أو استئذان. «مديرة» لها كل شيء: الاعتماد، والمعلمات، والرموز، والصلاحيات.</p>
       <p class="hint">«رصيد سابق»: أيام الغياب حسب نوعها (اضطراري، مرضي، بدون عذر، أخرى) ومرات الاستئذان قبل تشغيل المنصة في <span class="yr"></span>. تُضاف إلى رصيد المعلمة وإحصائية كل نوع.</p>
       <div class="tablebox"><table class="staff-table">
-        <thead><tr><th>المعلمة</th><th>الجوال</th><th>الرمز وإرساله</th><th>الحالة</th><th>الصلاحية</th><th>صلاحية الأداء</th><th style="min-width:180px">رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th></tr></thead>
+        <thead><tr><th>المعلمة</th><th>المسمى الوظيفي</th><th>الجوال</th><th>الرمز وإرساله</th><th>الحالة</th><th>الصلاحيات</th><th style="min-width:180px">رصيد سابق (أيام الغياب حسب النوع، ومرات الاستئذان)</th></tr></thead>
         <tbody id="staff-body"></tbody>
       </table></div>
     </section>
@@ -1026,17 +1026,28 @@ function renderSum() {
   [["a", tot.emerg, "أيام غياب اضطراري"], ["a", tot.sick, "أيام غياب مرضي"], ["a", tot.unexc, "أيام غياب بدون عذر"], ["a", tot.other, "أيام غياب أخرى"], ["", tot.days, "إجمالي أيام الغياب"]]
     .forEach(([c, v, l]) => { const d = el("div", "stat " + c); d.append(el("b", null, String(v)), el("span", null, l)); st.append(d); });
 }
+const JOB_TITLES = ["معلمة", "معلمة موهبة", "مرشدة طلابية", "إدارية", "محضرة مختبر", "وكيلة", "مديرة المدرسة"];
 function renderStaff() {
   const body = $("staff-body");
   const unsaved = new Map([...body.querySelectorAll("input[data-dirty]")].map(i => [i.id, i.value]));
   const focused = document.activeElement && body.contains(document.activeElement) ? document.activeElement.id : null;
   body.replaceChildren();
-  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 7; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
+  if (!teachers.size) { const tr = el("tr"), td = el("td", null, "لا توجد معلمات بعد. أضيفي أول معلمة من النموذج أعلاه."); td.colSpan = 8; td.style.textAlign = "center"; tr.append(td); body.append(tr); return; }
   teachers.forEach(t => {
     const me = t.id === session.id;
     const tr = el("tr");
     const nmTd = el("td", null, t.name); if (t.specialty) { nmTd.append(el("br"), el("span", "hint", t.specialty)); } tr.append(nmTd);
-    const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; tr.append(ph);
+    const jtTd = el("td"), jt = el("select"); jt.id = "jt-" + t.id; jt.style.width = "auto";
+    ["", ...JOB_TITLES].forEach(v => { const o = el("option", null, v || "— اختاري —"); o.value = v; jt.append(o); });
+    jt.value = JOB_TITLES.includes(t.job_title) ? t.job_title : "";
+    jt.onchange = async () => {
+      jt.disabled = true;
+      try { await staff("set_title", { teacher_id: t.id, job_title: jt.value }); t.job_title = jt.value; }
+      catch (e) { jt.value = t.job_title || ""; }
+      jt.disabled = false;
+    };
+    jtTd.append(jt); tr.append(jtTd);
+    const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; ph.style.fontSize = ".85rem"; tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
     const roleTd = el("td"), rs = el("select"); rs.id = "role-" + t.id; rs.style.width = "auto";
@@ -1048,8 +1059,9 @@ function renderStaff() {
       catch (e) { rs.value = t.role || "teacher"; }
       rs.disabled = false;
     };
-    roleTd.append(rs); tr.append(roleTd);
-    const prTd = el("td"), prs = el("select"); prs.id = "prole-" + t.id; prs.style.width = "auto";
+    const lab = txt => { const l = el("span", "hint", txt); l.style.cssText = "display:block;font-size:.7rem"; return l; };
+    roleTd.append(lab("الغياب والاستئذان"), rs); tr.append(roleTd);
+    const prs = el("select"); prs.id = "prole-" + t.id; prs.style.width = "auto";
     Object.entries(PERF_ROLE_NAME).forEach(([k, v]) => { const o = el("option", null, v); o.value = k; prs.append(o); });
     prs.value = perfRoles.get(t.id) || "none";
     if (t.role === "manager") { prs.disabled = true; prs.title = "المديرة لها كل صلاحيات الأداء"; }
@@ -1059,7 +1071,7 @@ function renderStaff() {
       catch (e) { prs.value = perfRoles.get(t.id) || "none"; }
       prs.disabled = false;
     };
-    prTd.append(prs); tr.append(prTd);
+    const pl = lab("الأداء الوظيفي"); pl.style.marginTop = "6px"; roleTd.append(pl, prs);
     const priorTd = el("td"), pw = el("div", "prior-in");
     const cur = t.prior_year === yStartY;
     const fields = [["emerg", "اضطراري"], ["sick", "مرضي"], ["unexc", "بدون عذر"], ["other", "أخرى"], ["perms", "استئذان"]].map(([k, label]) => {
@@ -1107,7 +1119,7 @@ function renderStaff() {
       const wa = waLink(t.phone, t.name, t.pin); cur2.append(wa || el("span", "hint", "لا يوجد جوال"));
     };
     showPin();
-    wrap.append(pin, save); pinTd.append(cur2, wrap); tr.insertBefore(pinTd, tr.children[2]);
+    wrap.append(pin, save); pinTd.append(cur2, wrap); tr.insertBefore(pinTd, tr.children[3]);
     const b = el("button", "link", t.active ? "إيقاف" : "تفعيل");
     b.onclick = async () => { b.disabled = true; try { await staff("set_active", { teacher_id: t.id, active: !t.active }); } catch (e) {} loadAdmin(); };
     const del = el("button", "link", "حذف"); del.style.color = "var(--absent)";
@@ -1119,7 +1131,7 @@ function renderStaff() {
       catch (e) { del.disabled = false; del.textContent = "تعذّر الحذف"; return; }
       loadAdmin();
     };
-    if (!me) { const acts = el("div"); acts.style.cssText = "display:flex;gap:10px;margin-top:6px;font-size:.8rem"; acts.append(b, del); st.append(acts); }
+    if (!me) { const acts = el("div"); acts.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:6px;font-size:.8rem"; acts.append(b, del); st.append(acts); }
     body.append(tr);
   });
   unsaved.forEach((v, id) => { const i = document.getElementById(id); if (i) { i.value = v; i.dataset.dirty = "1"; } });
