@@ -1048,7 +1048,30 @@ function renderStaff() {
       jt.disabled = false;
     };
     jtTd.append(jt); tr.append(jtTd);
-    const ph = el("td", null, t.phone || "—"); ph.dir = "ltr"; ph.style.textAlign = "right"; ph.style.fontSize = ".85rem"; tr.append(ph);
+    // Mobile number, editable in place: shown as 05xxxxxxxx, saved as 9665xxxxxxxx.
+    const ph = el("td"), phIn = el("input"), phMsg = el("div", "hint");
+    phIn.id = "phone-" + t.id; phIn.dir = "ltr"; phIn.inputMode = "tel"; phIn.maxLength = 14; phIn.placeholder = "05xxxxxxxx";
+    phIn.style.cssText = "width:118px;padding:5px 8px;font-size:.85rem;text-align:left";
+    const local = v => { const d = normPhone(v); return d.startsWith("966") ? "0" + d.slice(3) : d; };
+    phIn.value = t.phone ? local(t.phone) : "";
+    phMsg.style.cssText = "font-size:.72rem;min-height:1em;white-space:normal;max-width:130px";
+    const savePhone = async () => {
+      if (!phIn.dataset.dirty) return;
+      const d = normPhone(phIn.value);
+      if (!/^9665\d{8}$/.test(d)) { phMsg.textContent = "رقم غير صحيح (05xxxxxxxx)"; phMsg.style.color = "var(--absent)"; return; }
+      if (d === t.phone) { delete phIn.dataset.dirty; phMsg.textContent = ""; return; }
+      phIn.disabled = true;
+      try { await staff("set_phone", { teacher_id: t.id, phone: d }); delete phIn.dataset.dirty; t.phone = d; phMsg.textContent = "تم الحفظ ✓"; phMsg.style.color = "var(--ok)"; setTimeout(loadAdmin, 800); }
+      catch (e) {
+        phMsg.style.color = "var(--absent)";
+        phMsg.textContent = /phone_taken/.test(e.message) ? "الرقم مسجّل لمعلمة أخرى" : /bad_phone/.test(e.message) ? "رقم غير صحيح" : "تعذّر الحفظ";
+      }
+      phIn.disabled = false;
+    };
+    phIn.addEventListener("input", () => { phIn.dataset.dirty = "1"; phMsg.textContent = "اضغطي Enter للحفظ"; phMsg.style.color = ""; });
+    phIn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); phIn.blur(); } });
+    phIn.addEventListener("change", savePhone);
+    ph.append(phIn, phMsg); tr.append(ph);
     const locked = t.locked_until && new Date(t.locked_until) > new Date();
     const st = el("td"); st.append(el("span", "st " + (!t.active ? "rejected" : locked ? "warn" : "approved"), !t.active ? "موقوفة" : locked ? "مقفلة مؤقتًا" : "فعّالة")); tr.append(st);
     const roleTd = el("td"), rs = el("select"); rs.id = "role-" + t.id; rs.style.width = "auto";
@@ -1114,7 +1137,7 @@ function renderStaff() {
     const cur2 = el("div", "inline-in"); cur2.style.marginBottom = "6px";
     const showPin = () => {
       cur2.replaceChildren();
-      if (!t.pin) { cur2.append(el("span", "hint", "يظهر الرمز تلقائيًا بعد أول دخول لها للمنصة")); return; }
+      if (!t.pin) { const h = el("span", "hint", "يظهر الرمز تلقائيًا بعد أول دخول لها للمنصة"); h.style.cssText = "white-space:normal;max-width:150px;font-size:.75rem"; cur2.append(h); return; }
       const code = el("b", null, t.pin); code.dir = "ltr"; code.style.letterSpacing = "2px";
       cur2.append(el("span", "hint", "الرمز: "), code);
       const wa = waLink(t.phone, t.name, t.pin); cur2.append(wa || el("span", "hint", "لا يوجد جوال"));
